@@ -180,6 +180,18 @@
     .week-row { background: var(--elevated); border-radius: 1rem; padding: .75rem .85rem; }
     .host ol { padding-left: 1.2rem; color: var(--muted); }
     .host code { font-family: "IBM Plex Mono", monospace; font-size: .8em; color: var(--accent); }
+    .author {
+      display: grid; gap: 1.25rem; margin-top: 1.15rem;
+    }
+    @media (min-width: 720px) {
+      .author { grid-template-columns: 10.5rem 1fr; align-items: start; gap: 1.6rem; }
+    }
+    .author img {
+      width: 10.5rem; height: 10.5rem; object-fit: cover; object-position: center 18%;
+      border-radius: 1rem; box-shadow: var(--shadow); background: var(--elevated);
+    }
+    .bio { color: var(--muted); font-size: .95rem; max-width: 36rem; }
+    .bio p { margin: 0 0 .85rem; }
     .err { color: var(--wrong); font-size: .8rem; margin: 0; }
     .file-btn input[type=file] { display: block; width: 100%; font-size: 16px; padding: .4rem 0; }
     #csv-drop.on { box-shadow: var(--shadow-h); outline: 1px dashed var(--accent); }
@@ -340,6 +352,7 @@
     if (parts[0]==="quiz") return {name:"quiz"};
     if (parts[0]==="results") return {name:"results"};
     if (parts[0]==="progress") return {name:"progress"};
+    if (parts[0]==="about") return {name:"about"};
     if (parts[0]==="hosting") return {name:"hosting"};
     return {name:"hub"};
   }
@@ -367,6 +380,7 @@
       <nav class="nav">
         <a href="#/" class="${r.name==="hub"?"on":""}">Home</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
+        <a href="#/about" class="${r.name==="about"?"on":""}">About</a>
         <a href="#/hosting" class="${r.name==="hosting"?"on":""}">File</a>
         <button class="icon-btn" data-act="theme" title="Toggle theme">${state.theme==="light"?"Dark":"Light"}</button>
       </nav>
@@ -972,6 +986,22 @@
     `, true);
   }
 
+  function viewAbout(){
+    return shell(`
+      <p class="eyebrow">Author</p>
+      <h1 class="hero">I built this for the boards.</h1>
+      <div class="author">
+        <img src="author.jpg" width="560" height="560" alt="Author of Plexus" />
+        <div class="bio">
+          <p class="small mono subtle" style="margin:0 0 .7rem">Started 11 September 2026</p>
+          <p>Plexus is my private question bank — year, course, quarter, week — so the coverage I sit this semester is the same desk I can open when I review for the PLE.</p>
+          <p>Timed stems. Rationale after. Missed and flagged, kept. A transfer file when I move between the laptop and the iPad. Not a review center. Not a class site. Just the repository I’ll keep using until the board exam.</p>
+          <p class="small subtle" style="margin:0">The live file is <a href="https://sjeraldxx.github.io/plexus/" style="color:var(--accent)">sjeraldxx.github.io/plexus</a>.</p>
+        </div>
+      </div>
+    `);
+  }
+
   function viewHosting(){
     return shell(`
       <p class="eyebrow">This file</p>
@@ -1080,6 +1110,7 @@
     else if (r.name==="quiz") html = viewQuiz();
     else if (r.name==="results") html = viewResults();
     else if (r.name==="progress") html = viewProgress();
+    else if (r.name==="about") html = viewAbout();
     else if (r.name==="hosting") html = viewHosting();
     else html = viewHub();
     root.innerHTML = html;
