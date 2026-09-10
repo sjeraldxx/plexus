@@ -172,6 +172,7 @@
     .host code { font-family: "IBM Plex Mono", monospace; font-size: .8em; color: var(--accent); }
     .err { color: var(--wrong); font-size: .8rem; margin: 0; }
     .file-btn input[type=file] { display: block; width: 100%; font-size: 16px; padding: .4rem 0; }
+    #csv-drop.on { box-shadow: var(--shadow-h); outline: 1px dashed var(--accent); }
   </style>
 </head>
 <body>
@@ -253,7 +254,15 @@
   ];
 
   function uid(p){ return p + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
-  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":"&#39;"}[c])); }
+  function esc(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, c => ({
+      "&": "&"+"amp;",
+      "<": "&"+"lt;",
+      ">": "&"+"gt;",
+      '"': "&"+"quot;",
+      "'": "&#39;"
+    }[c]));
+  }
   function pct(n,d){ return d<=0 ? 0 : Math.round(n/d*100); }
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
   function fmtElapsed(ms){ const s=Math.max(0,Math.floor(ms/1000)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
@@ -299,6 +308,7 @@
     quizMode: "review",
     shuffle: true,
     timerOn: true,
+    skipDupes: true,
     confirmFinish: false
   };
   let timerIv = null;
@@ -535,7 +545,32 @@
     });
     return {rows, errors};
   }
-  function csvEscape(v){ return /[",\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  function questionKey(q){
+    return String(q && q.stem || "").toLowerCase()
+      .replace(/[''`]/g, "'")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+  function courseKeys(courseId){
+    const set = new Set();
+    state.questions.forEach(q => { if (q.courseId === courseId) set.add(questionKey(q)); });
+    return set;
+  }
+  function sweepCourseDupes(courseId){
+    const seen = new Set();
+    let n = 0;
+    state.questions = state.questions.filter(q => {
+      if (q.courseId !== courseId) return true;
+      const k = questionKey(q);
+      if (!k) return true;
+      if (seen.has(k)) { n++; return false; }
+      seen.add(k);
+      return true;
+    });
+    return n;
+  }
+  function csvEscape(v){ return /[",\n\r]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v==null?"":v); }
   function questionsToCsv(qs){
     const header="question,option_a,option_b,option_c,option_d,option_e,correct,rationale,coverage";
     const lines = qs.map(q => {
@@ -702,9 +737,9 @@
         </div>
         <button class="btn" data-act="start-practice" data-id="${course.id}" ${pool.length?"":"disabled"}>Start ${pool.length} item${pool.length===1?"":"s"}</button>
       </div>
-      <div class="card" style="margin-top:1rem">
+      <div class="card" id="csv-drop" style="margin-top:1rem">
         <p class="eyebrow" style="margin:0">CSV import</p>
-        <p class="small muted">Columns: question, option_a–d, correct, rationale, coverage. Adds directly to the week you pick.</p>
+        <p class="small muted">Drop one or more files. Columns: question, option_a–d, correct, rationale, coverage. Duplicate stems are skipped so only one copy is kept.</p>
         <div class="row" style="margin:.7rem 0">
           <label class="field" style="min-width:7rem"><span>Quarter</span>
             <select id="csv-q">${[1,2,3,4].map(n=>`<option ${t.quarter===n?"selected":""}>${n}</option>`).join("")}</select>
@@ -717,10 +752,14 @@
           </label>
         </div>
         <div class="stack" style="margin:.7rem 0 0">
-          <label class="field">CSV file
-            <input id="csv-file" class="file-btn" type="file" accept=".csv,text/csv,text/plain,.txt" />
+          <label class="field">CSV files — select several at once, or add more after
+            <input id="csv-file" class="file-btn" type="file" accept=".csv,text/csv,text/plain,.txt" multiple />
           </label>
-          <button class="btn ghost" type="button" data-act="csv-template">Download template</button>
+          <div class="row">
+            <label class="switch"><input type="checkbox" id="skip-dupes" ${ui.skipDupes?"checked":""}/> Skip duplicates</label>
+            <button class="btn ghost" type="button" data-act="csv-template">Download template</button>
+            <button class="btn ghost" type="button" data-act="sweep-dupes" data-id="${course.id}">Clean course duplicates</button>
+          </div>
         </div>
         <div id="csv-preview" style="margin-top:.8rem"></div>
       </div>
@@ -1064,11 +1103,26 @@
     }
     const file = document.getElementById("csv-file");
     if (file) file.onchange = () => {
-      const f = file.files && file.files[0]; if (!f) return;
-      const reader = new FileReader();
-      reader.onload = () => showCsvPreview(String(reader.result));
-      reader.readAsText(f);
+      const list = file.files;
+      ingestCsvFiles(list);
+      file.value = "";
     };
+    const skip = document.getElementById("skip-dupes");
+    if (skip) skip.onchange = () => {
+      ui.skipDupes = skip.checked;
+      paintCsvPreview();
+    };
+    const drop = document.getElementById("csv-drop");
+    if (drop){
+      drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("on"); };
+      drop.ondragleave = () => drop.classList.remove("on");
+      drop.ondrop = (e) => {
+        e.preventDefault();
+        drop.classList.remove("on");
+        ingestCsvFiles(e.dataTransfer && e.dataTransfer.files);
+      };
+    }
+    if (csvPending && csvPending.batches && csvPending.batches.length) paintCsvPreview();
     const imp = document.getElementById("import-json");
     if (imp) imp.onchange = () => {
       const f = imp.files && imp.files[0]; if (!f) return;
@@ -1080,8 +1134,12 @@
           const haveC = new Set(state.courses.map(c=>c.id));
           const haveQ = new Set(state.questions.map(q=>q.id));
           let nc=0,nq=0;
-          dump.courses.forEach(c => { if(!haveC.has(c.id)){ state.courses.push(c); nc++; } });
-          dump.questions.forEach(q => { if(!haveQ.has(q.id)){ state.questions.push(q); nq++; } });
+          dump.courses.forEach(c => { if(!haveC.has(c.id)){ state.courses.push(c); nc++; haveC.add(c.id); } });
+          dump.questions.forEach(q => {
+            if (haveQ.has(q.id)) return;
+            if (ui.skipDupes && q.courseId && courseKeys(q.courseId).has(questionKey(q))) return;
+            state.questions.push(q); nq++; haveQ.add(q.id);
+          });
           save(); toast(`Merged ${nc} courses and ${nq} items.`); render();
         } catch(e){ toast("That file is not a Plexus bank export."); }
       };
@@ -1090,16 +1148,56 @@
     window.onkeydown = onKey;
   }
 
-  let csvPending = null;
-  function showCsvPreview(text){
-    const res = interpretCsv(text);
-    csvPending = res;
+  let csvPending = { batches: [] };
+
+  function ingestCsvFiles(fileList){
+    const files = Array.from(fileList || []).filter(f => f && f.size);
+    if (!files.length) return;
+    Promise.all(files.map(f => f.text().then(text => ({ name: f.name, text }))))
+      .then(parts => {
+        parts.forEach(p => {
+          const res = interpretCsv(p.text);
+          csvPending.batches.push({ name: p.name, rows: res.rows, errors: res.errors });
+        });
+        paintCsvPreview();
+        toast(parts.length === 1 ? `Read ${parts[0].name}.` : `Read ${parts.length} files.`);
+      })
+      .catch(() => toast("Could not read one of the files."));
+  }
+
+  function pendingSplit(courseId){
+    const have = courseKeys(courseId);
+    const unique = [];
+    const dupes = [];
+    (csvPending.batches || []).forEach(b => {
+      (b.rows || []).forEach(r => {
+        const k = questionKey(r);
+        if (!k) return;
+        if (ui.skipDupes && have.has(k)) { dupes.push(r); return; }
+        have.add(k);
+        unique.push(r);
+      });
+    });
+    const errors = [];
+    (csvPending.batches || []).forEach(b => (b.errors || []).forEach(e => errors.push(Object.assign({ file: b.name }, e))));
+    return { unique, dupes, errors, files: csvPending.batches || [] };
+  }
+
+  function paintCsvPreview(){
     const box = document.getElementById("csv-preview");
     if (!box) return;
-    box.innerHTML = `<p class="small">${res.rows.length} ready${res.errors.length?`, ${res.errors.length} skipped`:""}.</p>
-      ${res.errors.slice(0,6).map(e=>`<p class="small" style="color:var(--wrong);margin:.2rem 0">Line ${e.line}: ${esc(e.message)}</p>`).join("")}
-      ${res.rows.length?`<button class="btn" data-act="commit-csv">Add ${res.rows.length} to selected week</button>`:""}
-      <div class="stack" style="margin-top:.6rem">${res.rows.slice(0,5).map((r,i)=>`<p class="small" style="margin:0"><span class="mono muted">${i+1}.</span> ${esc(r.stem.slice(0,110))}</p>`).join("")}</div>`;
+    const courseId = route().id;
+    const split = pendingSplit(courseId);
+    if (!split.files.length){ box.innerHTML = ""; return; }
+    box.innerHTML = `
+      <p class="small" style="margin:0 0 .45rem">${split.files.length} file${split.files.length===1?"":"s"} · <strong>${split.unique.length}</strong> unique ready${split.dupes.length?` · ${split.dupes.length} duplicate${split.dupes.length===1?"":"s"} skipped`:""}${split.errors.length?` · ${split.errors.length} row${split.errors.length===1?"":"s"} invalid`:""}.</p>
+      <div class="stack" style="margin-bottom:.6rem">${split.files.map(f => `<p class="small subtle" style="margin:0">${esc(f.name)} — ${f.rows.length} parsed${f.errors.length?`, ${f.errors.length} invalid`:""}</p>`).join("")}</div>
+      ${split.errors.slice(0,8).map(e=>`<p class="small" style="color:var(--wrong);margin:.2rem 0">${esc(e.file||"")} line ${e.line}: ${esc(e.message)}</p>`).join("")}
+      <div class="row">
+        ${split.unique.length?`<button class="btn" type="button" data-act="commit-csv">Add ${split.unique.length} unique item${split.unique.length===1?"":"s"}</button>`:""}
+        <button class="btn ghost" type="button" data-act="clear-csv">Clear queue</button>
+      </div>
+      <div class="stack" style="margin-top:.6rem">${split.unique.slice(0,6).map((r,i)=>`<p class="small" style="margin:0"><span class="mono muted">${i+1}.</span> ${esc(r.stem.slice(0,110))}</p>`).join("")}${split.unique.length>6?`<p class="small subtle">+ ${split.unique.length-6} more</p>`:""}</div>`;
   }
 
   function onClick(e){
@@ -1192,22 +1290,38 @@
       return;
     }
     if (act==="commit-csv"){
-      if (!csvPending || !csvPending.rows.length) return;
       const courseId = route().id;
-      const q = Number(document.getElementById("csv-q").value);
-      const w = Number(document.getElementById("csv-w").value);
-      const def = (document.getElementById("csv-cov").value||"").trim();
-      csvPending.rows.forEach(r => {
+      const split = pendingSplit(courseId);
+      if (!split.unique.length){ toast(ui.skipDupes && split.dupes.length ? "All of those questions are already in this course." : "Nothing to add."); return; }
+      const qEl = document.getElementById("csv-q");
+      const wEl = document.getElementById("csv-w");
+      const q = Number(qEl && qEl.value);
+      const w = Number(wEl && wEl.value);
+      const def = ((document.getElementById("csv-cov")||{}).value||"").trim();
+      split.unique.forEach(r => {
         state.questions.push({
           id: uid("q"), courseId, quarter:q, week:w,
           coverage: r.coverage || def, stem:r.stem, options:r.options,
           correctIndex:r.correctIndex, rationale:r.rationale, createdAt:Date.now(), sample:false
         });
       });
-      const n = csvPending.rows.length;
-      csvPending=null; save(); toast(`Added ${n} items to Q${q} Week ${w}.`);
+      csvPending = { batches: [] };
+      save();
+      const extra = split.dupes.length ? ` Skipped ${split.dupes.length} duplicate${split.dupes.length===1?"":"s"}.` : "";
+      toast(`Added ${split.unique.length} item${split.unique.length===1?"":"s"} to Q${q} Week ${w}.${extra}`);
       ui.courseTarget = { scope:"week", quarter:q, week:w, coverage:null };
       render(); return;
+    }
+    if (act==="clear-csv"){
+      csvPending = { batches: [] };
+      paintCsvPreview();
+      toast("Upload queue cleared.");
+      return;
+    }
+    if (act==="sweep-dupes"){
+      const n = sweepCourseDupes(t.dataset.id);
+      if (!n){ toast("No duplicates in this course."); return; }
+      save(); toast(`Removed ${n} duplicate${n===1?"":"s"}. First copy kept.`); render(); return;
     }
     if (act==="set-slice"){
       ui.courseTarget = { scope:t.dataset.scope, quarter:Number(t.dataset.q)||1, week:Number(t.dataset.w)||1, coverage:t.dataset.cov||null };
