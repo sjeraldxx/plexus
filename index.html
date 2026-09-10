@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Plexus</title>
-  <meta name="description" content="Year-level medical question bank. Courses, quarters, weekly coverage, a 60-second timer, and CSV import. Progress stays on this device." />
+  <title>Plexus · my bank</title>
+  <meta name="description" content="Private question bank for the year: courses, quarters, weekly coverage, a 60-second timer." />
   <meta name="theme-color" content="#12151a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -187,8 +187,8 @@
   const YEARS = ["YL1","YL2","YL3"];
   const YEAR_LABELS = { YL1: "Year 1", YL2: "Year 2", YL3: "Year 3" };
   const YEAR_BLURBS = {
-    YL1: "Basic sciences — structure, function, and the molecules underneath both.",
-    YL2: "Mechanisms of disease and the drugs that meet them.",
+    YL1: "Anatomy and the molecules under it — the map I keep for the wards.",
+    YL2: "Mechanisms of disease, and the drugs that meet them.",
     YL3: "Clerkship stems. Put the science next to a patient."
   };
 
@@ -355,9 +355,9 @@
     return `<header class="app"><div class="bar">
       <a class="brand display" href="#/">${markSvg()}Plexus</a>
       <nav class="nav">
-        <a href="#/" class="${r.name==="hub"?"on":""}">Hub</a>
+        <a href="#/" class="${r.name==="hub"?"on":""}">Home</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
-        <a href="#/hosting" class="${r.name==="hosting"?"on":""}">Pages</a>
+        <a href="#/hosting" class="${r.name==="hosting"?"on":""}">File</a>
         <button class="icon-btn" data-act="theme" title="Toggle theme">${state.theme==="light"?"Dark":"Light"}</button>
       </nav>
     </div></header>
@@ -594,27 +594,25 @@
     const flagged = flaggedIds();
     return shell(`
       <section>
-        <p class="eyebrow">Medical curriculum bank</p>
-        <h1 class="hero">Year, course, quarter, week.</h1>
-        <p class="lead">One HTML file. Courses, weeks, CSV import, 60-second timer. Everything — questions, scores, flags — stays in this browser. No account, no server.</p>
+        <p class="eyebrow">Private bank</p>
+        <h1 class="hero">This week’s coverage.</h1>
+        <p class="lead">My questions, my weeks, my misses. Upload the lecture, sit the 60-second timer, then come back to the ones I got wrong.</p>
         <div class="row" style="margin-top:1.2rem">
           <span class="badge accent">${state.questions.length} items</span>
           <span class="badge">${state.courses.length} courses</span>
-          <span class="badge">Saved on this device</span>
+          <span class="badge">Saved here</span>
         </div>
-        <div class="row" style="margin-top:.8rem">
-          <button class="btn" data-act="save-html">Download this HTML file</button>
-        </div>
+
       </section>
       ${resume ? `<div class="card row" style="margin-top:1.6rem;justify-content:space-between">
-        <div><p class="small muted" style="margin:0">Resume</p>
+        <div><p class="small muted" style="margin:0">Pick up where I left</p>
         <p class="display" style="margin:.2rem 0 0;font-size:1.15rem">Question ${resume.index+1} of ${resume.items.length}</p>
         <p class="small muted" style="margin:0">${esc(resume.title)}</p></div>
         <a class="btn" href="#/quiz">Continue</a>
       </div>` : ""}
       ${(missed.length||flagged.length) ? `<div class="row" style="margin-top:1rem">
-        ${missed.length?`<button class="btn sec" data-act="drill-missed">Practice ${missed.length} missed</button>`:""}
-        ${flagged.length?`<button class="btn ghost" data-act="drill-flagged">${flagged.length} flagged</button>`:""}
+        ${missed.length?`<button class="btn sec" data-act="drill-missed">Redo ${missed.length} I missed</button>`:""}
+        ${flagged.length?`<button class="btn ghost" data-act="drill-flagged">${flagged.length} I flagged</button>`:""}
       </div>`:""}
       <div class="grid-3" style="margin-top:1.8rem">
         ${YEARS.map(yl => {
@@ -627,20 +625,15 @@
           </a>`;
         }).join("")}
       </div>
-      <div class="card" style="margin-top:1.6rem">
-        <p class="eyebrow" style="margin:0">GitHub Pages</p>
-        <p class="display" style="margin:.4rem 0 0;font-size:1.3rem">This file is the whole app.</p>
-        <p class="small muted">Upload <code class="mono">index.html</code> to a GitHub repo, then Settings → Pages → Deploy from branch. Same idea as StudyMats. <a href="#/hosting" style="color:var(--accent)">Step-by-step</a>.</p>
-      </div>
-      <p class="small subtle" style="margin-top:2rem;max-width:36rem">Teaching items written for Plexus, plus whatever you upload. Not affiliated with the PRC, any medical school, or a review center.</p>
+      <p class="small subtle" style="margin-top:2rem;max-width:36rem">Sample items are here so the desk isn’t empty. Everything I upload stays on this browser until I move a transfer file to the iPad.</p>
     `, true);
   }
 
   function viewYear(yl){
-    if (!YEARS.includes(yl)) return shell(`<p class="muted">Unknown year level.</p><p><a class="btn" href="#/">Back to hub</a></p>`);
+    if (!YEARS.includes(yl)) return shell(`<p class="muted">That year isn’t here.</p><p><a class="btn" href="#/">Home</a></p>`);
     const list = state.courses.filter(c => c.year===yl);
     return shell(`
-      <a class="small muted" href="#/">← Hub</a>
+      <a class="small muted" href="#/">← Home</a>
       <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.8rem">
         <div>
           <p class="mono eyebrow" style="margin:0">${yl}</p>
@@ -650,8 +643,8 @@
         <button class="btn" type="button" data-act="new-course" data-year="${yl}">New course</button>
       </div>
       ${list.length===0 ? `<div class="card" style="margin-top:1.6rem;text-align:center;padding:2rem">
-        <p class="display" style="font-size:1.3rem;margin:0">No courses yet</p>
-        <p class="small muted">Create a course, then upload a CSV for Week 1 of Quarter 1.</p>
+        <p class="display" style="font-size:1.3rem;margin:0">Nothing in this year yet</p>
+        <p class="small muted">Make a course, then drop Week 1 of Quarter 1.</p>
         <button class="btn" type="button" data-act="new-course" data-year="${yl}">Create course</button>
       </div>` : `<div class="grid-3" style="margin-top:1.5rem">${list.map(c => {
         const qs = courseQs(c.id);
@@ -671,7 +664,7 @@
 
   function viewCourse(id){
     const course = state.courses.find(c => c.id===id);
-    if (!course) return shell(`<p class="muted">That course is not in this bank.</p><p><a class="btn" href="#/">Back to hub</a></p>`);
+    if (!course) return shell(`<p class="muted">That course isn’t on this desk.</p><p><a class="btn" href="#/">Home</a></p>`);
     const qs = courseQs(id);
     const cur = curriculum(id);
     const t = ui.courseTarget;
@@ -694,13 +687,13 @@
           <p class="lead small">${esc(course.blurb)}</p>
         </div>
         <div class="row">
-          <button class="btn sec" data-act="add-q" data-id="${course.id}">Add item</button>
+          <button class="btn sec" data-act="add-q" data-id="${course.id}">Add a question</button>
           <button class="btn ghost" data-act="export-csv" data-id="${course.id}">Export CSV</button>
           <button class="btn ghost" data-act="delete-course" data-id="${course.id}">Delete</button>
         </div>
       </div>
       <div class="card" style="margin-top:1.4rem">
-        <p class="eyebrow" style="margin:0">Practice</p>
+        <p class="eyebrow" style="margin:0">Sit a set</p>
         <p class="display" style="margin:.35rem 0;font-size:1.25rem">${esc(sliceLabel)} · ${pool.length} items</p>
         <div class="row" style="margin:.6rem 0">
           <label class="field" style="min-width:9rem"><span>Slice</span>
@@ -738,8 +731,8 @@
         <button class="btn" data-act="start-practice" data-id="${course.id}" ${pool.length?"":"disabled"}>Start ${pool.length} item${pool.length===1?"":"s"}</button>
       </div>
       <div class="card" id="csv-drop" style="margin-top:1rem">
-        <p class="eyebrow" style="margin:0">CSV import</p>
-        <p class="small muted">Drop one or more files. Columns: question, option_a–d, correct, rationale, coverage. Duplicate stems are skipped so only one copy is kept.</p>
+        <p class="eyebrow" style="margin:0">This week’s file</p>
+        <p class="small muted">Drop one or more CSVs for the week I just covered. Same stem is kept once.</p>
         <div class="row" style="margin:.7rem 0">
           <label class="field" style="min-width:7rem"><span>Quarter</span>
             <select id="csv-q">${[1,2,3,4].map(n=>`<option ${t.quarter===n?"selected":""}>${n}</option>`).join("")}</select>
@@ -752,18 +745,18 @@
           </label>
         </div>
         <div class="stack" style="margin:.7rem 0 0">
-          <label class="field">CSV files — select several at once, or add more after
+          <label class="field">CSV files — I can add more after this
             <input id="csv-file" class="file-btn" type="file" accept=".csv,text/csv,text/plain,.txt" multiple />
           </label>
           <div class="row">
-            <label class="switch"><input type="checkbox" id="skip-dupes" ${ui.skipDupes?"checked":""}/> Skip duplicates</label>
-            <button class="btn ghost" type="button" data-act="csv-template">Download template</button>
-            <button class="btn ghost" type="button" data-act="sweep-dupes" data-id="${course.id}">Clean course duplicates</button>
+            <label class="switch"><input type="checkbox" id="skip-dupes" ${ui.skipDupes?"checked":""}/> Skip ones I already have</label>
+            <button class="btn ghost" type="button" data-act="csv-template">CSV template</button>
+            <button class="btn ghost" type="button" data-act="sweep-dupes" data-id="${course.id}">Remove copies</button>
           </div>
         </div>
         <div id="csv-preview" style="margin-top:.8rem"></div>
       </div>
-      <h2 style="margin:1.6rem 0 .6rem;font-size:1.5rem">Four quarters</h2>
+      <h2 style="margin:1.6rem 0 .6rem;font-size:1.5rem">The four quarters</h2>
       <div class="grid-2">${cur.map(qtr => `
         <div class="card">
           <div class="row" style="justify-content:space-between">
@@ -771,10 +764,10 @@
             <span class="badge">${qtr.count} items</span>
           </div>
           <div class="row" style="margin-top:.6rem">
-            <button class="btn sm ${t.scope==="quarter"&&t.quarter===qtr.quarter?"":"sec"}" data-act="set-slice" data-scope="quarter" data-q="${qtr.quarter}">Review quarter</button>
-            <button class="btn sm ghost" data-act="add-q" data-id="${course.id}" data-q="${qtr.quarter}">Add to Q${qtr.quarter}</button>
+            <button class="btn sm ${t.scope==="quarter"&&t.quarter===qtr.quarter?"":"sec"}" data-act="set-slice" data-scope="quarter" data-q="${qtr.quarter}">This quarter</button>
+            <button class="btn sm ghost" data-act="add-q" data-id="${course.id}" data-q="${qtr.quarter}">Add here</button>
           </div>
-          ${qtr.weeks.length===0?`<p class="small subtle">No weeks uploaded yet.</p>`:`<div class="stack" style="margin-top:.7rem">${qtr.weeks.map(w => `
+          ${qtr.weeks.length===0?`<p class="small subtle">Nothing uploaded here yet.</p>`:`<div class="stack" style="margin-top:.7rem">${qtr.weeks.map(w => `
             <div class="week-row">
               <div class="row" style="justify-content:space-between">
                 <button class="btn ghost sm" data-act="set-slice" data-scope="week" data-q="${qtr.quarter}" data-w="${w.week}" style="padding-left:0">Week ${w.week} <span class="muted">${w.count} items</span></button>
@@ -788,7 +781,7 @@
 
   function viewQuiz(){
     const ses = state.session;
-    if (!ses || !ses.items.length) return shell(`<p class="muted">No active session.</p><p><a class="btn" href="#/">Hub</a></p>`);
+    if (!ses || !ses.items.length) return shell(`<p class="muted">No set in progress.</p><p><a class="btn" href="#/">Home</a></p>`);
     if (ses.finishedAt) { go("#/results"); return ""; }
     const item = ses.items[ses.index];
     const chosen = ses.answers[item.questionId];
@@ -826,7 +819,7 @@
         }).join("")}
       </div>
       ${revealed ? `<div class="rationale" style="margin-top:1rem">
-        <p class="small" style="margin:0;color:${chosen===item.correctIndex?"var(--correct)":"var(--wrong)"}">${timedOut && chosen===null ? "Time ran out." : chosen===item.correctIndex ? "Correct." : "Incorrect."} Answer ${LETTERS[item.correctIndex]}.</p>
+        <p class="small" style="margin:0;color:${chosen===item.correctIndex?"var(--correct)":"var(--wrong)"}">${timedOut && chosen===null ? "Time ran out." : chosen===item.correctIndex ? "That’s it." : "Not this one."} Answer ${LETTERS[item.correctIndex]}.</p>
         <p class="small" style="margin:.4rem 0 0">${esc(item.rationale)}</p>
       </div>` : ""}
       <div class="row" style="margin-top:1.2rem;justify-content:space-between">
@@ -836,20 +829,20 @@
           ${isLast ? `<button class="btn" data-act="do-finish">See results</button>` : `<button class="btn" data-act="next">Next</button>`}
         </div>
       </div>
-      ${ui.confirmFinish?`<div class="card" style="margin-top:1rem"><p style="margin:0">End this set and score it?</p>
-        <div class="row" style="margin-top:.7rem"><button class="btn" data-act="do-finish">Score now</button>
+      ${ui.confirmFinish?`<div class="card" style="margin-top:1rem"><p style="margin:0">Score this set now?</p>
+        <div class="row" style="margin-top:.7rem"><button class="btn" data-act="do-finish">Score it</button>
         <button class="btn ghost" data-act="cancel-finish">Keep going</button></div></div>`:""}
     `);
   }
 
   function viewResults(){
     const ses = state.session;
-    if (!ses) return shell(`<p class="muted">No results yet.</p><p><a class="btn" href="#/">Hub</a></p>`);
+    if (!ses) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/">Home</a></p>`);
     const s = scoreSession(ses);
     const missed = s.wrong + s.unanswered;
     const acc = pct(s.correct, s.total);
     return shell(`
-      <p class="eyebrow">Results</p>
+      <p class="eyebrow">This set</p>
       <h1 class="hero" style="font-size:2.4rem">${acc}%</h1>
       <p class="lead small">${esc(ses.title)}</p>
       <div class="grid-3" style="margin:1.2rem 0">
@@ -859,8 +852,8 @@
       </div>
       <p class="small muted">${fmtElapsed((ses.finishedAt||Date.now())-ses.startedAt)} · ${ses.shuffled?"Shuffled":"In order"} · ${ses.timerSeconds?ses.timerSeconds+"s timer":"No timer"}</p>
       <div class="row" style="margin:1rem 0">
-        <a class="btn" href="${ses.courseId?"#/course/"+ses.courseId:"#/"}">Back to course</a>
-        <button class="btn sec" data-act="retry">Retry same set</button>
+        <a class="btn" href="${ses.courseId?"#/course/"+ses.courseId:"#/"}">Back to the course</a>
+        <button class="btn sec" data-act="retry">Sit it again</button>
       </div>
       <div class="card" style="overflow:auto">
         <table>
@@ -889,30 +882,30 @@
     Object.values(state.itemStats).forEach(s => { seen+=s.seen; correct+=s.correct; wrong+=s.wrong; timedOut+=s.timedOut; });
     const missed = missedIds().length, flagged = flaggedIds().length;
     return shell(`
-      <p class="eyebrow">Progress</p>
-      <h1 class="hero" style="font-size:2.4rem">On this device</h1>
-      <p class="lead small">This browser keeps its own copy. A laptop and an iPad will not match until you move a transfer file.</p>
+      <p class="eyebrow">How I’m doing</p>
+      <h1 class="hero" style="font-size:2.4rem">This browser.</h1>
+      <p class="lead small">Scores live here. The iPad won’t know what the laptop did until I restore a transfer file.</p>
       <div class="grid-3" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))">
         <div class="card"><p class="small muted" style="margin:0">Accuracy</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${pct(correct,seen)}%</p></div>
         <div class="card"><p class="small muted" style="margin:0">Correct</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${correct}</p></div>
         <div class="card"><p class="small muted" style="margin:0">Misses</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${wrong}</p></div>
         <div class="card"><p class="small muted" style="margin:0">Timed out</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${timedOut}</p></div>
         <div class="card"><p class="small muted" style="margin:0">Flagged</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${flagged}</p></div>
-        <div class="card"><p class="small muted" style="margin:0">Open misses</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${missed}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Still wrong</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${missed}</p></div>
       </div>
       <div class="card" style="margin:1.2rem 0">
-        <p class="eyebrow" style="margin:0">Laptop ↔ iPad</p>
-        <p class="display" style="margin:.35rem 0 0;font-size:1.25rem">Move a transfer file</p>
-        <p class="small muted">Save on the laptop, AirDrop or put it in iCloud Drive / Files, then restore here. That copies courses, questions, scores, and flags. It replaces what is on this device.</p>
+        <p class="eyebrow" style="margin:0">Laptop and iPad</p>
+        <p class="display" style="margin:.35rem 0 0;font-size:1.25rem">Carry the bank with me</p>
+        <p class="small muted">Save on the laptop, AirDrop or drop it in Files, then restore on the iPad. That copies my courses, questions, scores, and flags onto this device.</p>
         <div class="row" style="margin-top:.8rem">
-          <button class="btn" type="button" data-act="export-transfer">Save transfer file</button>
-          <label class="btn sec">Restore transfer file<input id="restore-json" type="file" accept="application/json,.json" hidden /></label>
+          <button class="btn" type="button" data-act="export-transfer">Save my transfer file</button>
+          <label class="btn sec">Restore onto this device<input id="restore-json" type="file" accept="application/json,.json" hidden /></label>
           <button class="btn ghost" type="button" data-act="export-bank">Questions only</button>
           <label class="btn ghost">Merge questions<input id="import-json" type="file" accept="application/json,.json" hidden /></label>
         </div>
         <div class="row" style="margin-top:.55rem">
-          <button class="btn ghost" type="button" data-act="reset-progress">Reset progress</button>
-          <button class="btn warn sm" type="button" data-act="wipe">Wipe bank</button>
+          <button class="btn ghost" type="button" data-act="reset-progress">Clear my scores</button>
+          <button class="btn warn sm" type="button" data-act="wipe">Start the bank over</button>
         </div>
       </div>
       <h2 style="font-size:1.3rem">By year</h2>
@@ -922,8 +915,8 @@
           <p class="display" style="margin:.4rem 0 0">${YEAR_LABELS[yl]}</p>
           <p class="small muted">${st.courses} courses · ${st.questions} items</p></a>`;
       }).join("")}</div>
-      <h2 style="font-size:1.3rem;margin-top:1.4rem">Recent sessions</h2>
-      ${state.attempts.length===0?`<p class="small muted">No sessions yet.</p>`:`<div class="card" style="overflow:auto"><table>
+      <h2 style="font-size:1.3rem;margin-top:1.4rem">Sets I’ve sat</h2>
+      ${state.attempts.length===0?`<p class="small muted">None yet — that’s fine.</p>`:`<div class="card" style="overflow:auto"><table>
         <thead><tr><th>When</th><th>Set</th><th>Scope</th><th>Score</th><th>Time</th></tr></thead>
         <tbody>${state.attempts.slice(0,30).map(a => `<tr>
           <td class="small">${new Date(a.at).toLocaleString()}</td>
@@ -938,19 +931,13 @@
 
   function viewHosting(){
     return shell(`
-      <p class="eyebrow">GitHub Pages</p>
-      <h1 class="hero" style="font-size:2.4rem">Host this file like StudyMats.</h1>
+      <p class="eyebrow">This file</p>
+      <h1 class="hero" style="font-size:2.4rem">The whole desk is one HTML file.</h1>
+      <p class="lead">I already host it on GitHub Pages. Keep a copy on the laptop too, in case I want it offline.</p>
       <div class="card host" style="margin-top:1.2rem">
-        <ol>
-          <li>Create a new GitHub repository (example name: <code>plexus</code>).</li>
-          <li>Upload this <code>index.html</code> to the <strong>root</strong> of the repo. Optional: also upload <code>sample-week.csv</code>.</li>
-          <li>Open the repo → <strong>Settings</strong> → <strong>Pages</strong>.</li>
-          <li>Build and deployment: Source = <strong>Deploy from a branch</strong>. Branch = <strong>main</strong> / folder <strong>/ (root)</strong>. Save.</li>
-          <li>After a minute your site is <code>https://YOUR_USERNAME.github.io/plexus/</code>.</li>
-        </ol>
-        <p class="small muted">No build step. Hash routes work on GitHub Pages without a 404 fallback. Progress is stored on each device.</p>
+        <p class="small muted" style="margin-top:0">Live at <code>sjeraldxx.github.io/plexus</code>. Progress still lives in the browser I open it with.</p>
         <div class="row">
-          <button class="btn" data-act="save-html">Download this file</button>
+          <button class="btn" data-act="save-html">Save a local copy</button>
           <button class="btn sec" data-act="csv-template">CSV template</button>
         </div>
       </div>
@@ -998,11 +985,11 @@
 
   function modalNewCourse(year){
     openModal(`<p class="eyebrow" style="margin:0">New course · ${esc(year)}</p>
-      <h3 style="margin:.3rem 0 1rem">Four quarters from day one</h3>
+      <h3 style="margin:.3rem 0 1rem">Four quarters from today</h3>
       <form data-act="create-course" data-year="${esc(year)}" class="stack">
         <label class="field">Name<input id="c-name" name="name" type="text" placeholder="Gross Anatomy" autocomplete="off" /></label>
         <label class="field">Code<input id="c-code" name="code" type="text" placeholder="ANAT" maxlength="8" autocomplete="off" /></label>
-        <label class="field">Blurb<textarea id="c-blurb" name="blurb" placeholder="What this course covers"></textarea></label>
+        <label class="field">Blurb<textarea id="c-blurb" name="blurb" placeholder="What I want this course for"></textarea></label>
         <p id="modal-err" class="err" hidden></p>
         <div class="row" style="margin-top:.3rem">
           <button class="btn" type="button" data-act="create-course" data-year="${esc(year)}">Create course</button>
@@ -1014,8 +1001,8 @@
   function modalAddQ(courseId, quarter, week){
     const q = quarter || ui.courseTarget.quarter || 1;
     const w = week || ui.courseTarget.week || 1;
-    openModal(`<p class="eyebrow" style="margin:0">Add item</p>
-      <h3 style="margin:.3rem 0 1rem">One question, four options</h3>
+    openModal(`<p class="eyebrow" style="margin:0">Add a question</p>
+      <h3 style="margin:.3rem 0 1rem">One stem, four options</h3>
       <form data-act="save-q" data-id="${esc(courseId)}" class="stack">
         <label class="field">Question<textarea id="q-stem"></textarea></label>
         <label class="field">A<input id="q-a" type="text" /></label>
@@ -1139,7 +1126,7 @@
       f.text().then(text => {
         const dump = JSON.parse(text);
         if (!dump.courses || !dump.questions) throw new Error("bad");
-        if (!confirm("Replace everything on this device with this transfer file? Courses, questions, and progress will match the other device.")) return;
+        if (!confirm("Replace everything on this device with the transfer file? It will match the other one.")) return;
         state.theme = dump.theme || state.theme;
         state.courses = dump.courses;
         state.questions = dump.questions;
@@ -1149,9 +1136,9 @@
         state.seeded = true;
         document.documentElement.classList.toggle("light", state.theme==="light");
         save();
-        toast("This device now matches the transfer file.");
+        toast("This device now matches the other one.");
         go("#/");
-      }).catch(() => toast("That file is not a Plexus transfer."));
+      }).catch(() => toast("That isn’t one of my transfer files."));
     };
     const imp = document.getElementById("import-json");
     if (imp) imp.onchange = () => {
@@ -1171,7 +1158,7 @@
             state.questions.push(q); nq++; haveQ.add(q.id);
           });
           save(); toast(`Merged ${nc} courses and ${nq} items.`); render();
-        } catch(e){ toast("That file is not a Plexus bank export."); }
+        } catch(e){ toast("That isn’t a questions file I recognize."); }
       };
       reader.readAsText(f);
     };
@@ -1192,7 +1179,7 @@
         paintCsvPreview();
         toast(parts.length === 1 ? `Read ${parts[0].name}.` : `Read ${parts.length} files.`);
       })
-      .catch(() => toast("Could not read one of the files."));
+      .catch(() => toast("Couldn’t read one of those files."));
   }
 
   function pendingSplit(courseId){
@@ -1256,17 +1243,17 @@
       const year = t.dataset.year;
       if (!name || !code){
         const err = document.getElementById("modal-err");
-        if (err){ err.hidden = false; err.textContent = "Name and code are required."; }
-        else toast("Name and code are required.");
+        if (err){ err.hidden = false; err.textContent = "Need a name and a code."; }
+        else toast("Need a name and a code.");
         return;
       }
       if (!YEARS.includes(year)){
-        toast("Pick a year first.");
+        toast("Pick the year first.");
         return;
       }
       const id = uid("crs");
-      state.courses.push({id, year, name, code, blurb: blurb||"Custom course.", createdAt:Date.now(), sample:false});
-      save(); closeModal(); toast("Course created."); go("#/course/"+id); return;
+      state.courses.push({id, year, name, code, blurb: blurb||"I’ll fill this in.", createdAt:Date.now(), sample:false});
+      save(); closeModal(); toast("Course is on the desk."); go("#/course/"+id); return;
     }
     if (act==="add-q"){ modalAddQ(t.dataset.id, t.dataset.q ? Number(t.dataset.q) : undefined, t.dataset.w ? Number(t.dataset.w) : undefined); return; }
     if (act==="save-q"){
@@ -1293,27 +1280,27 @@
         return;
       }
       state.questions.push({id:uid("q"), courseId:t.dataset.id, quarter, week, coverage, stem, options:opts, correctIndex, rationale, createdAt:Date.now(), sample:false});
-      save(); closeModal(); toast("Item added."); render(); return;
+      save(); closeModal(); toast("Saved."); render(); return;
     }
     if (act==="delete-course"){
-      if (!confirm("Delete this course and all of its items?")) return;
+      if (!confirm("Delete this course and every question in it?")) return;
       const id=t.dataset.id;
       const c=state.courses.find(x=>x.id===id);
       state.courses=state.courses.filter(x=>x.id!==id);
       state.questions=state.questions.filter(x=>x.courseId!==id);
-      save(); toast("Course removed."); go(c?"#/year/"+c.year:"#/"); return;
+      save(); toast("Course is gone."); go(c?"#/year/"+c.year:"#/"); return;
     }
     if (act==="delete-week"){
-      if (!confirm("Remove every item in this week?")) return;
+      if (!confirm("Remove every question in this week?")) return;
       const id=t.dataset.id, q=Number(t.dataset.q), w=Number(t.dataset.w);
       state.questions=state.questions.filter(x => !(x.courseId===id && x.quarter===q && x.week===w));
-      save(); toast("Week removed."); render(); return;
+      save(); toast("That week is gone."); render(); return;
     }
     if (act==="export-csv"){
       const qs=courseQs(t.dataset.id);
       const c=state.courses.find(x=>x.id===t.dataset.id);
       download((c?c.code.toLowerCase():"course")+".csv", questionsToCsv(qs), "text/csv");
-      toast("CSV downloaded."); return;
+      toast("CSV saved."); return;
     }
     if (act==="csv-template"){
       download("sample-week.csv", `question,option_a,option_b,option_c,option_d,correct,rationale,coverage\n"The long thoracic nerve innervates which muscle?","Latissimus dorsi","Serratus anterior","Trapezius","Rhomboid major",B,"The long thoracic nerve (C5–C7) supplies serratus anterior. Injury produces a winged scapula.","Upper limb"\n"Which vertebral level corresponds to the sternal angle?","T2/T3","T4/T5","T6/T7","T8/T9",B,"The sternal angle (of Louis) marks the T4/T5 disc.","Thorax"\n`, "text/csv");
@@ -1322,7 +1309,7 @@
     if (act==="commit-csv"){
       const courseId = route().id;
       const split = pendingSplit(courseId);
-      if (!split.unique.length){ toast(ui.skipDupes && split.dupes.length ? "All of those questions are already in this course." : "Nothing to add."); return; }
+      if (!split.unique.length){ toast(ui.skipDupes && split.dupes.length ? "I already have all of those." : "Nothing new to add."); return; }
       const qEl = document.getElementById("csv-q");
       const wEl = document.getElementById("csv-w");
       const q = Number(qEl && qEl.value);
@@ -1345,13 +1332,13 @@
     if (act==="clear-csv"){
       csvPending = { batches: [] };
       paintCsvPreview();
-      toast("Upload queue cleared.");
+      toast("Queue cleared.");
       return;
     }
     if (act==="sweep-dupes"){
       const n = sweepCourseDupes(t.dataset.id);
-      if (!n){ toast("No duplicates in this course."); return; }
-      save(); toast(`Removed ${n} duplicate${n===1?"":"s"}. First copy kept.`); render(); return;
+      if (!n){ toast("No copies in this course."); return; }
+      save(); toast(`Removed ${n} duplicate${n===1?"":"s"}. Kept the first copy.`); render(); return;
     }
     if (act==="set-slice"){
       ui.courseTarget = { scope:t.dataset.scope, quarter:Number(t.dataset.q)||1, week:Number(t.dataset.w)||1, coverage:t.dataset.cov||null };
@@ -1372,7 +1359,7 @@
         coverage: tgt.scope==="coverage"?tgt.coverage:null,
         mode: ui.quizMode, shuffle: ui.shuffle, timerSeconds: ui.timerOn?60:0, count:0
       });
-      if (!ok){ toast("No items in that slice yet. Upload a week first."); return; }
+      if (!ok){ toast("Nothing in that slice yet. Drop a week first."); return; }
       go("#/quiz"); return;
     }
     if (act==="drill-missed" || act==="drill-flagged"){
@@ -1420,26 +1407,26 @@
         seeded: true
       };
       download("plexus-transfer-"+stamp+".json", JSON.stringify(dump), "application/json");
-      toast("Transfer file saved. Open it on the other device via Progress.");
+      toast("Transfer file saved. Restore it under Progress on the other device.");
       return;
     }
     if (act==="export-bank"){
       download("plexus-bank.json", JSON.stringify({version:1, exportedAt:Date.now(), courses:state.courses, questions:state.questions}, null, 2), "application/json");
-      toast("Bank exported."); return;
+      toast("Questions file saved."); return;
     }
     if (act==="reset-progress"){
-      if (!confirm("Clear attempts, flags, and item stats? Questions stay.")) return;
-      state.attempts=[]; state.itemStats={}; state.session=null; save(); toast("Progress cleared."); render(); return;
+      if (!confirm("Clear my scores and flags? Questions stay.")) return;
+      state.attempts=[]; state.itemStats={}; state.session=null; save(); toast("Scores cleared."); render(); return;
     }
     if (act==="wipe"){
-      if (!confirm("Delete every course and question on this device?")) return;
+      if (!confirm("Start over? This deletes my courses and questions on this device.")) return;
       const s=buildSeed();
       state.courses=s.courses; state.questions=s.questions; state.attempts=[]; state.itemStats={}; state.session=null; state.seeded=true;
-      save(); toast("Bank restored to sample items."); go("#/"); return;
+      save(); toast("Back to the sample items."); go("#/"); return;
     }
     if (act==="save-html"){
       download("index.html", document.documentElement.outerHTML, "text/html");
-      toast("Saved index.html — upload it to GitHub."); return;
+      toast("Saved a local copy of this file."); return;
     }
   }
 
