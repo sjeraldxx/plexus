@@ -2,91 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Plexus</title>
   <meta name="description" content="Year-level medical question bank. Courses, quarters, weekly coverage, a 60-second timer, and CSV import. Progress stays on this device." />
-  <meta name="theme-color" content="#0B0E10" />
+  <meta name="theme-color" content="#12151a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0b0e10;
-      --surface: #121618;
-      --elevated: #181d20;
-      --fg: #ecefed;
-      --muted: #8a9390;
-      --subtle: #5d6663;
-      --accent: #8fb4b0;
-      --accent-fg: #0b0e10;
-      --border: rgba(236,239,237,.1);
-      --correct: #6f9e7c;
-      --wrong: #c07a72;
-      --flag: #c4b59a;
-      --shadow: 0 0 0 1px rgba(236,239,237,.08);
-      --shadow-h: 0 0 0 1px rgba(236,239,237,.16);
+      --bg: #12151a;
+      --surface: #1a1f26;
+      --elevated: #222830;
+      --fg: #f1f3f5;
+      --muted: #9aa3ab;
+      --subtle: #6b747c;
+      --accent: #b7c9be;
+      --accent-fg: #12151a;
+      --border: rgba(241,243,245,.09);
+      --correct: #8fbe9c;
+      --wrong: #d3928c;
+      --flag: #d2c3a4;
+      --shadow: 0 0 0 1px rgba(241,243,245,.07);
+      --shadow-h: 0 0 0 1px rgba(241,243,245,.14);
       color-scheme: dark;
     }
     html.light {
-      --bg: #f3f1eb;
-      --surface: #faf9f5;
-      --elevated: #fff;
-      --fg: #161a18;
-      --muted: #5c6562;
-      --subtle: #8a918e;
-      --accent: #3d6b68;
-      --accent-fg: #f3f1eb;
-      --border: rgba(22,26,24,.1);
+      --bg: #f3f1ec;
+      --surface: #fbfaf7;
+      --elevated: #ffffff;
+      --fg: #1a1d21;
+      --muted: #5c656c;
+      --subtle: #8a9197;
+      --accent: #3e6b5e;
+      --accent-fg: #f3f1ec;
+      --border: rgba(26,29,33,.1);
       --correct: #2f6b48;
       --wrong: #9a4038;
       --flag: #8a7048;
-      --shadow: 0 0 0 1px rgba(22,26,24,.06), 0 1px 2px -1px rgba(22,26,24,.06);
-      --shadow-h: 0 0 0 1px rgba(22,26,24,.1), 0 2px 6px 0 rgba(22,26,24,.06);
+      --shadow: 0 0 0 1px rgba(26,29,33,.06), 0 1px 2px rgba(26,29,33,.04);
+      --shadow-h: 0 0 0 1px rgba(26,29,33,.1), 0 8px 24px rgba(26,29,33,.06);
       color-scheme: light;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       font-family: Figtree, ui-sans-serif, system-ui, sans-serif;
       min-height: 100dvh;
-      line-height: 1.5;
+      line-height: 1.55;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     }
     h1,h2,h3,.display { font-family: Fraunces, "Times New Roman", serif; font-weight: 600; letter-spacing: -.02em; }
     .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
     button, input, select, textarea { font: inherit; color: inherit; }
     a { color: inherit; text-decoration: none; }
+    button, a, input, select, label { touch-action: manipulation; }
     header.app {
       position: sticky; top: 0; z-index: 20;
       border-bottom: 1px solid var(--border);
-      background: color-mix(in srgb, var(--bg) 85%, transparent);
-      backdrop-filter: blur(12px);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(14px);
     }
     .bar {
-      max-width: 72rem; margin: 0 auto; height: 3.5rem;
+      max-width: 72rem; margin: 0 auto; min-height: 3.5rem;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 1rem;
+      padding: .5rem 1rem;
     }
     .brand { display: flex; align-items: center; gap: .65rem; font-size: 1.15rem; }
     .nav { display: flex; align-items: center; gap: .25rem; }
     .nav a, .icon-btn {
-      display: inline-flex; align-items: center; height: 2.25rem; padding: 0 .75rem;
-      border-radius: .5rem; color: var(--muted); border: 0; background: transparent; cursor: pointer;
+      display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 .75rem;
+      border-radius: .6rem; color: var(--muted); border: 0; background: transparent; cursor: pointer;
     }
     .nav a:hover, .icon-btn:hover, .nav a.on { background: var(--elevated); color: var(--fg); }
     main { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
     main.narrow { max-width: 48rem; }
     .eyebrow { font-size: .75rem; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
-    .hero { font-size: clamp(2rem, 6vw, 3.6rem); line-height: 1.05; margin: .75rem 0 0; }
+    .hero { font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.08; margin: .75rem 0 0; }
     .lead { max-width: 36rem; color: var(--muted); font-size: 1.05rem; }
     .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
     .badge {
-      display: inline-flex; align-items: center; height: 1.6rem; padding: 0 .55rem;
+      display: inline-flex; align-items: center; min-height: 1.6rem; padding: 0 .55rem;
       border-radius: 999px; font-size: .72rem; letter-spacing: .04em;
       background: var(--elevated); color: var(--muted); box-shadow: var(--shadow);
     }
     .badge.accent { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
     .card {
-      background: var(--surface); border-radius: 1.5rem; padding: 1.35rem 1.4rem;
+      background: var(--surface); border-radius: 1.35rem; padding: 1.35rem 1.4rem;
       box-shadow: var(--shadow); transition: box-shadow .15s;
     }
     a.card:hover, button.card:hover { box-shadow: var(--shadow-h); }
@@ -95,38 +98,49 @@
     @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } .grid-3 { grid-template-columns: 1fr 1fr 1fr; } }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
-      height: 2.5rem; padding: 0 1rem; border-radius: .75rem; border: 0; cursor: pointer;
-      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .9rem;
+      min-height: 2.75rem; padding: 0 1.05rem; border-radius: .8rem; border: 0; cursor: pointer;
+      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .95rem;
     }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
     .btn.sec { background: var(--elevated); color: var(--fg); box-shadow: var(--shadow); }
     .btn.ghost { background: transparent; color: var(--muted); }
     .btn.ghost:hover { color: var(--fg); background: var(--elevated); }
-    .btn.sm { height: 2rem; padding: 0 .7rem; font-size: .8rem; border-radius: .6rem; }
+    .btn.sm { min-height: 2.25rem; padding: 0 .75rem; font-size: .8rem; border-radius: .65rem; }
     .btn.warn { background: color-mix(in srgb, var(--wrong) 22%, transparent); color: var(--wrong); }
     .muted { color: var(--muted); } .subtle { color: var(--subtle); } .small { font-size: .875rem; }
-    .stack { display: grid; gap: .65rem; }
-    label.field { display: grid; gap: .3rem; font-size: .8rem; color: var(--muted); }
+    .stack { display: grid; gap: .7rem; }
+    label.field { display: grid; gap: .35rem; font-size: .8rem; color: var(--muted); }
     input[type=text], input[type=number], select, textarea {
-      background: var(--elevated); border: 1px solid var(--border); border-radius: .7rem;
-      padding: .65rem .8rem; outline: none; width: 100%;
+      background: var(--elevated); border: 1px solid var(--border); border-radius: .75rem;
+      padding: .75rem .85rem; outline: none; width: 100%; font-size: 16px;
     }
     textarea { min-height: 5.5rem; resize: vertical; }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
     .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 40;
-      display: flex; align-items: flex-end; justify-content: center; padding: 1rem;
+      position: fixed; inset: 0; background: rgba(8,10,12,.62); z-index: 40;
+      display: flex; align-items: flex-end; justify-content: center; padding: 0;
     }
-    @media (min-width: 720px) { .overlay { align-items: center; } }
-    .modal { background: var(--surface); border-radius: 1.25rem; width: min(36rem, 100%); max-height: 90dvh; overflow: auto; padding: 1.25rem; box-shadow: var(--shadow-h); }
+    @media (min-width: 720px) {
+      .overlay { align-items: center; padding: 1.25rem; }
+    }
+    .modal {
+      background: var(--surface); width: min(28rem, 100%);
+      max-height: min(92dvh, 100%); overflow: auto;
+      padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+      box-shadow: var(--shadow-h);
+      border-radius: 1.25rem 1.25rem 0 0;
+    }
+    @media (min-width: 720px) {
+      .modal { border-radius: 1.25rem; }
+    }
     .opt {
       display: flex; gap: .8rem; align-items: flex-start; width: 100%; text-align: left;
       background: var(--elevated); border: 1px solid transparent; border-radius: 1rem;
-      padding: .9rem 1rem; cursor: pointer; color: var(--fg);
+      padding: .95rem 1rem; cursor: pointer; color: var(--fg); min-height: 3rem;
     }
     .opt:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
     .opt .ltr {
-      flex: none; width: 1.7rem; height: 1.7rem; border-radius: .5rem;
+      flex: none; width: 1.75rem; height: 1.75rem; border-radius: .5rem;
       display: grid; place-items: center; background: var(--surface); font-size: .8rem; font-weight: 600;
     }
     .opt.ok { background: color-mix(in srgb, var(--correct) 16%, var(--elevated)); }
@@ -144,18 +158,20 @@
     .timer.low { color: var(--wrong); background: conic-gradient(var(--wrong) calc(var(--p) * 1%), var(--elevated) 0); }
     .rationale { background: var(--elevated); border-radius: 1rem; padding: 1rem 1.1rem; }
     .toast {
-      position: fixed; bottom: 1rem; right: 1rem; z-index: 50;
-      background: var(--elevated); color: var(--fg); padding: .7rem 1rem; border-radius: .8rem;
-      box-shadow: var(--shadow-h); font-size: .875rem;
+      position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem; z-index: 50;
+      background: var(--elevated); color: var(--fg); padding: .75rem 1rem; border-radius: .8rem;
+      box-shadow: var(--shadow-h); font-size: .875rem; max-width: min(22rem, calc(100vw - 2rem));
     }
-    .switch { display: flex; align-items: center; gap: .55rem; font-size: .875rem; }
-    .switch input { accent-color: var(--accent); width: 1.05rem; height: 1.05rem; }
+    .switch { display: flex; align-items: center; gap: .55rem; font-size: .875rem; min-height: 2.5rem; }
+    .switch input { accent-color: var(--accent); width: 1.15rem; height: 1.15rem; }
     table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     th { text-align: left; color: var(--subtle); font-weight: 500; padding: .45rem .3rem; }
     td { padding: .5rem .3rem; border-top: 1px solid var(--border); }
     .week-row { background: var(--elevated); border-radius: 1rem; padding: .75rem .85rem; }
     .host ol { padding-left: 1.2rem; color: var(--muted); }
     .host code { font-family: "IBM Plex Mono", monospace; font-size: .8em; color: var(--accent); }
+    .err { color: var(--wrong); font-size: .8rem; margin: 0; }
+    .file-btn input[type=file] { display: block; width: 100%; font-size: 16px; padding: .4rem 0; }
   </style>
 </head>
 <body>
@@ -596,12 +612,12 @@
           <h1 class="hero" style="font-size:2.4rem">${YEAR_LABELS[yl]}</h1>
           <p class="lead small">${YEAR_BLURBS[yl]}</p>
         </div>
-        <button class="btn" data-act="new-course" data-year="${yl}">New course</button>
+        <button class="btn" type="button" data-act="new-course" data-year="${yl}">New course</button>
       </div>
       ${list.length===0 ? `<div class="card" style="margin-top:1.6rem;text-align:center;padding:2rem">
         <p class="display" style="font-size:1.3rem;margin:0">No courses yet</p>
         <p class="small muted">Create a course, then upload a CSV for Week 1 of Quarter 1.</p>
-        <button class="btn" data-act="new-course" data-year="${yl}">Create course</button>
+        <button class="btn" type="button" data-act="new-course" data-year="${yl}">Create course</button>
       </div>` : `<div class="grid-3" style="margin-top:1.5rem">${list.map(c => {
         const qs = courseQs(c.id);
         const weeks = new Set(qs.map(q => q.quarter+"-"+q.week)).size;
@@ -700,9 +716,11 @@
             <input id="csv-cov" type="text" placeholder="e.g. Upper limb" />
           </label>
         </div>
-        <div class="row">
-          <label class="btn sec">Choose CSV<input id="csv-file" type="file" accept=".csv,text/csv,text/plain" hidden /></label>
-          <button class="btn ghost" data-act="csv-template">Download template</button>
+        <div class="stack" style="margin:.7rem 0 0">
+          <label class="field">CSV file
+            <input id="csv-file" class="file-btn" type="file" accept=".csv,text/csv,text/plain,.txt" />
+          </label>
+          <button class="btn ghost" type="button" data-act="csv-template">Download template</button>
         </div>
         <div id="csv-preview" style="margin-top:.8rem"></div>
       </div>
@@ -892,20 +910,57 @@
   }
 
   function closeModal(){ document.getElementById("modal").innerHTML = ""; }
-  function openModal(html){ document.getElementById("modal").innerHTML = `<div class="overlay" data-act="close-modal"><div class="modal" data-stop="1">${html}</div></div>`; }
+  function openModal(html){
+    const root = document.getElementById("modal");
+    root.innerHTML = `<div class="overlay" id="overlay"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
+    const overlay = document.getElementById("overlay");
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal();
+    });
+    overlay.querySelector(".modal").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const t = e.target.closest("[data-act]");
+      if (t) handleAct(t, e);
+    });
+    const form = overlay.querySelector("form");
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const btn = form.querySelector("[data-act='create-course'], [data-act='save-q']");
+        if (btn) handleAct(btn, e);
+      });
+    }
+    const first = overlay.querySelector("input, textarea, select");
+    if (first) setTimeout(() => first.focus(), 50);
+  }
+
+  function modalError(msg){
+    let el = document.getElementById("modal-err");
+    if (!el) {
+      el = document.createElement("p");
+      el.id = "modal-err";
+      el.className = "err";
+      const modal = document.querySelector(".modal");
+      const actions = modal && modal.querySelector(".row:last-of-type");
+      if (actions) modal.insertBefore(el, actions);
+      else if (modal) modal.appendChild(el);
+    }
+    el.textContent = msg;
+  }
 
   function modalNewCourse(year){
-    openModal(`<p class="eyebrow" style="margin:0">New course · ${year}</p>
+    openModal(`<p class="eyebrow" style="margin:0">New course · ${esc(year)}</p>
       <h3 style="margin:.3rem 0 1rem">Four quarters from day one</h3>
-      <div class="stack">
-        <label class="field" for="c-name">Name<input id="c-name" type="text" placeholder="Gross Anatomy" /></label>
-        <label class="field" for="c-code">Code<input id="c-code" type="text" placeholder="ANAT" maxlength="8" /></label>
-        <label class="field" for="c-blurb">Blurb<textarea id="c-blurb" placeholder="What this course covers"></textarea></label>
-      </div>
-      <div class="row" style="margin-top:1rem">
-        <button class="btn" data-act="create-course" data-year="${year}">Create</button>
-        <button class="btn ghost" data-act="close-modal">Cancel</button>
-      </div>`);
+      <form data-act="create-course" data-year="${esc(year)}" class="stack">
+        <label class="field">Name<input id="c-name" name="name" type="text" placeholder="Gross Anatomy" autocomplete="off" /></label>
+        <label class="field">Code<input id="c-code" name="code" type="text" placeholder="ANAT" maxlength="8" autocomplete="off" /></label>
+        <label class="field">Blurb<textarea id="c-blurb" name="blurb" placeholder="What this course covers"></textarea></label>
+        <p id="modal-err" class="err" hidden></p>
+        <div class="row" style="margin-top:.3rem">
+          <button class="btn" type="button" data-act="create-course" data-year="${esc(year)}">Create course</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>
+      </form>`);
   }
 
   function modalAddQ(courseId, quarter, week){
@@ -913,26 +968,27 @@
     const w = week || ui.courseTarget.week || 1;
     openModal(`<p class="eyebrow" style="margin:0">Add item</p>
       <h3 style="margin:.3rem 0 1rem">One question, four options</h3>
-      <div class="stack">
-        <label class="field" for="q-stem">Question<textarea id="q-stem"></textarea></label>
-        <label class="field" for="q-a">A<input id="q-a" type="text" /></label>
-        <label class="field" for="q-b">B<input id="q-b" type="text" /></label>
-        <label class="field" for="q-c">C<input id="q-c" type="text" /></label>
-        <label class="field" for="q-d">D<input id="q-d" type="text" /></label>
-        <label class="field" for="q-key">Correct
+      <form data-act="save-q" data-id="${esc(courseId)}" class="stack">
+        <label class="field">Question<textarea id="q-stem"></textarea></label>
+        <label class="field">A<input id="q-a" type="text" /></label>
+        <label class="field">B<input id="q-b" type="text" /></label>
+        <label class="field">C<input id="q-c" type="text" /></label>
+        <label class="field">D<input id="q-d" type="text" /></label>
+        <label class="field">Correct
           <select id="q-key"><option>A</option><option>B</option><option>C</option><option>D</option></select>
         </label>
-        <label class="field" for="q-rat">Rationale<textarea id="q-rat"></textarea></label>
+        <label class="field">Rationale<textarea id="q-rat"></textarea></label>
         <div class="row">
-          <label class="field" for="q-q">Quarter<select id="q-q">${[1,2,3,4].map(n=>`<option ${n===q?"selected":""}>${n}</option>`).join("")}</select></label>
-          <label class="field" for="q-w">Week<select id="q-w">${Array.from({length:16},(_,i)=>i+1).map(n=>`<option ${n===w?"selected":""}>${n}</option>`).join("")}</select></label>
-          <label class="field" for="q-cov" style="flex:1">Coverage<input id="q-cov" type="text" placeholder="e.g. Thorax" /></label>
+          <label class="field">Quarter<select id="q-q">${[1,2,3,4].map(n=>`<option ${n===q?"selected":""}>${n}</option>`).join("")}</select></label>
+          <label class="field">Week<select id="q-w">${Array.from({length:16},(_,i)=>i+1).map(n=>`<option ${n===w?"selected":""}>${n}</option>`).join("")}</select></label>
+          <label class="field" style="flex:1">Coverage<input id="q-cov" type="text" placeholder="e.g. Thorax" /></label>
         </div>
-      </div>
-      <div class="row" style="margin-top:1rem">
-        <button class="btn" data-act="save-q" data-id="${courseId}">Save item</button>
-        <button class="btn ghost" data-act="close-modal">Cancel</button>
-      </div>`);
+        <p id="modal-err" class="err" hidden></p>
+        <div class="row">
+          <button class="btn" type="button" data-act="save-q" data-id="${esc(courseId)}">Save item</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>
+      </form>`);
   }
 
   function render(){
@@ -990,16 +1046,6 @@
 
   function bind(){
     document.getElementById("app").onclick = onClick;
-    const modal = document.getElementById("modal");
-    modal.onclick = (e) => {
-      const t = e.target.closest("[data-act]");
-      if (e.target.dataset && e.target.dataset.act==="close-modal") { closeModal(); return; }
-      if (!t) return;
-      if (t.closest("[data-stop]") && t.dataset.act!=="close-modal" && t.dataset.act!=="create-course" && t.dataset.act!=="save-q") {
-        /* keep */
-      }
-      handleAct(t, e);
-    };
     const scope = document.getElementById("scope");
     if (scope){
       scope.onchange = () => { ui.courseTarget.scope = scope.value; render(); };
@@ -1072,26 +1118,52 @@
     if (act==="close-modal"){ closeModal(); return; }
     if (act==="new-course"){ modalNewCourse(t.dataset.year); return; }
     if (act==="create-course"){
-      const name = (document.getElementById("c-name").value||"").trim();
-      const code = (document.getElementById("c-code").value||"").trim().toUpperCase();
-      const blurb = (document.getElementById("c-blurb").value||"").trim();
-      if (!name || !code){ toast("Name and code are required."); return; }
+      const nameEl = document.getElementById("c-name");
+      const codeEl = document.getElementById("c-code");
+      const blurbEl = document.getElementById("c-blurb");
+      if (!nameEl || !codeEl) { toast("Could not read the form. Try again."); return; }
+      const name = (nameEl.value||"").trim();
+      const code = (codeEl.value||"").trim().toUpperCase();
+      const blurb = ((blurbEl && blurbEl.value)||"").trim();
+      const year = t.dataset.year;
+      if (!name || !code){
+        const err = document.getElementById("modal-err");
+        if (err){ err.hidden = false; err.textContent = "Name and code are required."; }
+        else toast("Name and code are required.");
+        return;
+      }
+      if (!YEARS.includes(year)){
+        toast("Pick a year first.");
+        return;
+      }
       const id = uid("crs");
-      state.courses.push({id, year:t.dataset.year, name, code, blurb: blurb||"Custom course.", createdAt:Date.now(), sample:false});
+      state.courses.push({id, year, name, code, blurb: blurb||"Custom course.", createdAt:Date.now(), sample:false});
       save(); closeModal(); toast("Course created."); go("#/course/"+id); return;
     }
     if (act==="add-q"){ modalAddQ(t.dataset.id, t.dataset.q ? Number(t.dataset.q) : undefined, t.dataset.w ? Number(t.dataset.w) : undefined); return; }
     if (act==="save-q"){
-      const stem=(document.getElementById("q-stem").value||"").trim();
+      const stemEl=document.getElementById("q-stem");
+      if (!stemEl){ toast("Could not read the form. Try again."); return; }
+      const stem=(stemEl.value||"").trim();
       const opts=["q-a","q-b","q-c","q-d"].map(id => (document.getElementById(id).value||"").trim()).filter(Boolean);
       const key=document.getElementById("q-key").value;
       const rationale=(document.getElementById("q-rat").value||"").trim();
       const quarter=Number(document.getElementById("q-q").value);
       const week=Number(document.getElementById("q-w").value);
       const coverage=(document.getElementById("q-cov").value||"").trim();
-      if (!stem || opts.length<2){ toast("Need a stem and at least two options."); return; }
+      if (!stem || opts.length<2){
+        const err = document.getElementById("modal-err");
+        if (err){ err.hidden = false; err.textContent = "Need a question and at least two options."; }
+        else toast("Need a stem and at least two options.");
+        return;
+      }
       const correctIndex = key.charCodeAt(0)-65;
-      if (correctIndex<0 || correctIndex>=opts.length){ toast("Correct option is empty."); return; }
+      if (correctIndex<0 || correctIndex>=opts.length){
+        const err = document.getElementById("modal-err");
+        if (err){ err.hidden = false; err.textContent = "The correct option is empty. Fill A/B first."; }
+        else toast("Correct option is empty.");
+        return;
+      }
       state.questions.push({id:uid("q"), courseId:t.dataset.id, quarter, week, coverage, stem, options:opts, correctIndex, rationale, createdAt:Date.now(), sample:false});
       save(); closeModal(); toast("Item added."); render(); return;
     }
@@ -1210,6 +1282,7 @@
   }
 
   function onKey(e){
+    if (e.key === "Escape" && document.querySelector(".overlay")) { closeModal(); return; }
     if (route().name!=="quiz") return;
     const tag=(e.target && e.target.tagName)||"";
     if (tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
