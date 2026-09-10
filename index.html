@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#12151a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,650&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #12151a;
@@ -48,13 +48,14 @@
     html, body { margin: 0; background: var(--bg); color: var(--fg); }
     html { -webkit-text-size-adjust: 100%; }
     body {
-      font-family: Figtree, ui-sans-serif, system-ui, sans-serif;
+      font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
       min-height: 100dvh;
-      line-height: 1.55;
+      line-height: 1.5;
+      font-size: 16px;
       padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     }
-    h1,h2,h3,.display { font-family: Fraunces, "Times New Roman", serif; font-weight: 600; letter-spacing: -.02em; }
-    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+    h1,h2,h3,.display,.stem { font-family: "Source Serif 4", "Source Serif Pro", "Times New Roman", serif; font-weight: 600; letter-spacing: -.015em; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
     button, input, select, textarea { font: inherit; color: inherit; }
     a { color: inherit; text-decoration: none; }
     button, a, input, select, label { touch-action: manipulation; }
@@ -65,22 +66,31 @@
       backdrop-filter: blur(14px);
     }
     .bar {
-      max-width: 72rem; margin: 0 auto; min-height: 3.5rem;
+      max-width: 68rem; margin: 0 auto; min-height: 3.15rem;
       display: flex; align-items: center; justify-content: space-between;
-      padding: .5rem 1rem;
+      padding: .35rem 1rem;
     }
-    .brand { display: flex; align-items: center; gap: .65rem; font-size: 1.15rem; }
-    .nav { display: flex; align-items: center; gap: .25rem; }
+    .brand { display: flex; align-items: center; gap: .55rem; font-size: 1.05rem; }
+    .nav { display: flex; align-items: center; gap: .15rem; }
     .nav a, .icon-btn {
-      display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 .75rem;
-      border-radius: .6rem; color: var(--muted); border: 0; background: transparent; cursor: pointer;
+      display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 .7rem;
+      border-radius: .5rem; color: var(--muted); border: 0; background: transparent; cursor: pointer; font-size: .9rem;
     }
     .nav a:hover, .icon-btn:hover, .nav a.on { background: var(--elevated); color: var(--fg); }
-    main { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
-    main.narrow { max-width: 48rem; }
-    .eyebrow { font-size: .75rem; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
-    .hero { font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.08; margin: .75rem 0 0; }
-    .lead { max-width: 36rem; color: var(--muted); font-size: 1.05rem; }
+    main { max-width: 68rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    main.narrow { max-width: 44rem; }
+    .eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0; }
+    .hero { font-size: clamp(1.4rem, 2.6vw, 1.85rem); line-height: 1.2; margin: .35rem 0 0; font-weight: 650; }
+    .lead { max-width: 38rem; color: var(--muted); font-size: .95rem; margin: .4rem 0 0; }
+    .section { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--subtle); margin: 1.35rem 0 .55rem; }
+    .stem { font-size: 1.18rem; line-height: 1.45; font-weight: 500; margin: .35rem 0 0; }
+    .stat {
+      background: var(--surface); border-radius: 1rem; padding: .7rem .9rem; box-shadow: var(--shadow);
+    }
+    .stat .k { font-size: .7rem; color: var(--muted); margin: 0; letter-spacing: .04em; text-transform: uppercase; }
+    .stat .v { font-family: "Source Serif 4", serif; font-size: 1.25rem; margin: .15rem 0 0; font-variant-numeric: tabular-nums; }
+    .year-card h2 { font-size: 1.15rem; margin: .2rem 0 .2rem; }
+    .desk-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1rem 1.5rem; }
     .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
     .badge {
       display: inline-flex; align-items: center; min-height: 1.6rem; padding: 0 .55rem;
@@ -89,7 +99,7 @@
     }
     .badge.accent { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
     .card {
-      background: var(--surface); border-radius: 1.35rem; padding: 1.35rem 1.4rem;
+      background: var(--surface); border-radius: 1rem; padding: 1rem 1.1rem;
       box-shadow: var(--shadow); transition: box-shadow .15s;
     }
     a.card:hover, button.card:hover { box-shadow: var(--shadow-h); }
@@ -98,8 +108,8 @@
     @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } .grid-3 { grid-template-columns: 1fr 1fr 1fr; } }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
-      min-height: 2.75rem; padding: 0 1.05rem; border-radius: .8rem; border: 0; cursor: pointer;
-      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .95rem;
+      min-height: 2.4rem; padding: 0 .95rem; border-radius: .65rem; border: 0; cursor: pointer;
+      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .88rem;
     }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
     .btn.sec { background: var(--elevated); color: var(--fg); box-shadow: var(--shadow); }
@@ -156,7 +166,7 @@
     }
     .timer > span { width: 2.55rem; height: 2.55rem; border-radius: 50%; background: var(--bg); display: grid; place-items: center; }
     .timer.low { color: var(--wrong); background: conic-gradient(var(--wrong) calc(var(--p) * 1%), var(--elevated) 0); }
-    .rationale { background: var(--elevated); border-radius: 1rem; padding: 1rem 1.1rem; }
+    .rationale { background: var(--elevated); border-radius: .85rem; padding: .85rem 1rem; font-size: .92rem; line-height: 1.5; }
     .toast {
       position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem; z-index: 50;
       background: var(--elevated); color: var(--fg); padding: .75rem 1rem; border-radius: .8rem;
@@ -367,7 +377,14 @@
   function yearStats(yl){
     const cs = state.courses.filter(c => c.year===yl);
     const qs = state.questions.filter(q => cs.some(c => c.id===q.courseId));
-    return { courses: cs.length, questions: qs.length };
+    let seen=0, correct=0;
+    qs.forEach(q => { const s=state.itemStats[q.id]; if(s){ seen+=s.seen; correct+=s.correct; } });
+    return { courses: cs.length, questions: qs.length, seen, correct, acc: pct(correct, seen) };
+  }
+  function bankStats(){
+    let seen=0, correct=0, wrong=0, timedOut=0;
+    Object.values(state.itemStats).forEach(s => { seen+=s.seen; correct+=s.correct; wrong+=s.wrong; timedOut+=s.timedOut; });
+    return { seen, correct, wrong, timedOut, acc: pct(correct, seen) };
   }
   function missedIds(){
     return state.questions.filter(q => {
@@ -592,40 +609,66 @@
     const resume = state.session && !state.session.finishedAt && state.session.items.length ? state.session : null;
     const missed = missedIds();
     const flagged = flaggedIds();
+    const b = bankStats();
+    const last = state.attempts[0];
     return shell(`
-      <section>
-        <p class="eyebrow">Private bank</p>
-        <h1 class="hero">This week’s coverage.</h1>
-        <p class="lead">My questions, my weeks, my misses. Upload the lecture, sit the 60-second timer, then come back to the ones I got wrong.</p>
-        <div class="row" style="margin-top:1.2rem">
-          <span class="badge accent">${state.questions.length} items</span>
-          <span class="badge">${state.courses.length} courses</span>
-          <span class="badge">Saved here</span>
+      <div class="desk-head">
+        <div>
+          <p class="eyebrow">Review desk</p>
+          <h1 class="hero">Sit a set. Then the misses.</h1>
+          <p class="lead">One week of coverage, 60 seconds a stem, rationale after. Come back to whatever I got wrong.</p>
         </div>
-
-      </section>
-      ${resume ? `<div class="card row" style="margin-top:1.6rem;justify-content:space-between">
-        <div><p class="small muted" style="margin:0">Pick up where I left</p>
-        <p class="display" style="margin:.2rem 0 0;font-size:1.15rem">Question ${resume.index+1} of ${resume.items.length}</p>
-        <p class="small muted" style="margin:0">${esc(resume.title)}</p></div>
-        <a class="btn" href="#/quiz">Continue</a>
-      </div>` : ""}
-      ${(missed.length||flagged.length) ? `<div class="row" style="margin-top:1rem">
-        ${missed.length?`<button class="btn sec" data-act="drill-missed">Redo ${missed.length} I missed</button>`:""}
-        ${flagged.length?`<button class="btn ghost" data-act="drill-flagged">${flagged.length} I flagged</button>`:""}
-      </div>`:""}
-      <div class="grid-3" style="margin-top:1.8rem">
+      </div>
+      <div class="grid-3" style="margin-top:1rem">
+        <div class="stat"><p class="k">Bank</p><p class="v">${state.questions.length}</p><p class="small subtle" style="margin:.15rem 0 0">${state.courses.length} courses</p></div>
+        <div class="stat"><p class="k">Accuracy</p><p class="v">${b.seen>0? b.acc+"%":"—"}</p><p class="small subtle" style="margin:.15rem 0 0">${b.seen>0? b.correct+" of "+b.seen+" seen":"No attempts yet"}</p></div>
+        <div class="stat"><p class="k">Still open</p><p class="v">${missed.length}</p><p class="small subtle" style="margin:.15rem 0 0">${flagged.length} flagged</p></div>
+      </div>
+      <div class="grid-3" style="margin-top:.65rem">
+        ${resume ? `<a class="card" href="#/quiz">
+            <p class="eyebrow">In progress</p>
+            <p class="display" style="font-size:1.12rem;margin:.35rem 0 0">Q ${resume.index+1} / ${resume.items.length}</p>
+            <p class="small muted" style="margin:.25rem 0 0">${esc(resume.title)}</p>
+          </a>` : `<div class="card">
+            <p class="eyebrow">In progress</p>
+            <p class="display" style="font-size:1.12rem;margin:.35rem 0 0">Desk is clear</p>
+            <p class="small muted" style="margin:.25rem 0 0">Pick a year, then a week of coverage.</p>
+          </div>`}
+        <button class="card" data-act="drill-missed" ${missed.length?"":"disabled"} style="text-align:left;width:100%;border:0;cursor:${missed.length?"pointer":"default"};opacity:${missed.length?1:.55}">
+          <p class="eyebrow">Missed</p>
+          <p class="display" style="font-size:1.12rem;margin:.35rem 0 0">${missed.length ? missed.length+" to redo":"None waiting"}</p>
+          <p class="small muted" style="margin:.25rem 0 0">Wrong or timed out, never correct.</p>
+        </button>
+        <button class="card" data-act="drill-flagged" ${flagged.length?"":"disabled"} style="text-align:left;width:100%;border:0;cursor:${flagged.length?"pointer":"default"};opacity:${flagged.length?1:.55}">
+          <p class="eyebrow">Flagged</p>
+          <p class="display" style="font-size:1.12rem;margin:.35rem 0 0">${flagged.length ? flagged.length+" marked":"None marked"}</p>
+          <p class="small muted" style="margin:.25rem 0 0">Come back before the exam.</p>
+        </button>
+      </div>
+      <p class="section">Years</p>
+      <div class="grid-3">
         ${YEARS.map(yl => {
           const st = yearStats(yl);
-          return `<a class="card" href="#/year/${yl}" style="min-height:12rem;display:flex;flex-direction:column">
-            <p class="mono eyebrow" style="margin:0">${yl}</p>
-            <h2 style="margin:.6rem 0 0;font-size:1.8rem">${YEAR_LABELS[yl]}</h2>
-            <p class="small muted" style="flex:1">${YEAR_BLURBS[yl]}</p>
-            <p class="small subtle" style="margin:0">${st.courses} course${st.courses===1?"":"s"} · ${st.questions} items</p>
+          return `<a class="card year-card" href="#/year/${yl}">
+            <p class="mono eyebrow">${yl}</p>
+            <h2>${YEAR_LABELS[yl]}</h2>
+            <p class="small muted" style="margin:0 0 .55rem">${YEAR_BLURBS[yl]}</p>
+            <p class="small subtle" style="margin:0">${st.courses} course${st.courses===1?"":"s"} · ${st.questions} items${st.seen?` · ${st.acc}%` : ""}</p>
           </a>`;
         }).join("")}
       </div>
-      <p class="small subtle" style="margin-top:2rem;max-width:36rem">Sample items are here so the desk isn’t empty. Everything I upload stays on this browser until I move a transfer file to the iPad.</p>
+      <p class="section">Last sets</p>
+      ${last ? `<div class="card" style="overflow:auto;padding:.4rem .9rem .2rem">
+        <table>
+          <thead><tr><th>When</th><th>Set</th><th>Score</th></tr></thead>
+          <tbody>${state.attempts.slice(0,5).map(a => `<tr>
+            <td class="small mono">${new Date(a.at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</td>
+            <td>${esc(a.title)}</td>
+            <td class="mono">${a.correct}/${a.total} · ${pct(a.correct,a.total)}%</td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div>` : `<p class="small muted" style="margin:0">No scored sets yet. Open a year and sit this week’s coverage.</p>`}
+      <p class="small subtle" style="margin-top:1.4rem;max-width:34rem">Sample stems fill the bank until I upload a CSV. Scores stay in this browser; Progress has the transfer file for the iPad.</p>
     `, true);
   }
 
@@ -637,7 +680,7 @@
       <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.8rem">
         <div>
           <p class="mono eyebrow" style="margin:0">${yl}</p>
-          <h1 class="hero" style="font-size:2.4rem">${YEAR_LABELS[yl]}</h1>
+          <h1 class="hero">${YEAR_LABELS[yl]}</h1>
           <p class="lead small">${YEAR_BLURBS[yl]}</p>
         </div>
         <button class="btn" type="button" data-act="new-course" data-year="${yl}">New course</button>
@@ -683,7 +726,7 @@
       <div class="row" style="justify-content:space-between;align-items:flex-start;margin-top:.8rem">
         <div>
           <div class="row"><span class="badge accent">${esc(course.code)}</span><span class="badge">${course.year}</span><span class="badge">${qs.length} items</span></div>
-          <h1 class="hero" style="font-size:2.4rem">${esc(course.name)}</h1>
+          <h1 class="hero">${esc(course.name)}</h1>
           <p class="lead small">${esc(course.blurb)}</p>
         </div>
         <div class="row">
@@ -808,7 +851,7 @@
       </div>
       <div class="progress" style="margin:1rem 0"><span style="width:${progress}%"></span></div>
       <p class="small muted">Question ${ses.index+1} of ${ses.items.length}</p>
-      <h1 class="display" style="font-size:1.45rem;line-height:1.35">${esc(item.stem)}</h1>
+      <h1 class="stem">${esc(item.stem)}</h1>
       <div class="stack" style="margin-top:1rem">
         ${item.options.map((opt,i) => {
           let cls="opt";
@@ -843,7 +886,7 @@
     const acc = pct(s.correct, s.total);
     return shell(`
       <p class="eyebrow">This set</p>
-      <h1 class="hero" style="font-size:2.4rem">${acc}%</h1>
+      <h1 class="hero">${acc}%</h1>
       <p class="lead small">${esc(ses.title)}</p>
       <div class="grid-3" style="margin:1.2rem 0">
         <div class="card"><p class="small muted" style="margin:0">Correct</p><p class="display" style="font-size:1.8rem;margin:.2rem 0 0">${s.correct}</p></div>
@@ -883,7 +926,7 @@
     const missed = missedIds().length, flagged = flaggedIds().length;
     return shell(`
       <p class="eyebrow">How I’m doing</p>
-      <h1 class="hero" style="font-size:2.4rem">This browser.</h1>
+      <h1 class="hero">This browser.</h1>
       <p class="lead small">Scores live here. The iPad won’t know what the laptop did until I restore a transfer file.</p>
       <div class="grid-3" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))">
         <div class="card"><p class="small muted" style="margin:0">Accuracy</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${pct(correct,seen)}%</p></div>
@@ -932,7 +975,7 @@
   function viewHosting(){
     return shell(`
       <p class="eyebrow">This file</p>
-      <h1 class="hero" style="font-size:2.4rem">The whole desk is one HTML file.</h1>
+      <h1 class="hero">The whole desk is one HTML file.</h1>
       <p class="lead">I already host it on GitHub Pages. Keep a copy on the laptop too, in case I want it offline.</p>
       <div class="card host" style="margin-top:1.2rem">
         <p class="small muted" style="margin-top:0">Live at <code>sjeraldxx.github.io/plexus</code>. Progress still lives in the browser I open it with.</p>
