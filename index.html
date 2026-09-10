@@ -891,7 +891,7 @@
     return shell(`
       <p class="eyebrow">Progress</p>
       <h1 class="hero" style="font-size:2.4rem">On this device</h1>
-      <p class="lead small">Attempts, misses, and flags stay in your browser. Export the bank before you clear it.</p>
+      <p class="lead small">This browser keeps its own copy. A laptop and an iPad will not match until you move a transfer file.</p>
       <div class="grid-3" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))">
         <div class="card"><p class="small muted" style="margin:0">Accuracy</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${pct(correct,seen)}%</p></div>
         <div class="card"><p class="small muted" style="margin:0">Correct</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${correct}</p></div>
@@ -900,11 +900,20 @@
         <div class="card"><p class="small muted" style="margin:0">Flagged</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${flagged}</p></div>
         <div class="card"><p class="small muted" style="margin:0">Open misses</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${missed}</p></div>
       </div>
-      <div class="row" style="margin:1rem 0">
-        <button class="btn sec" data-act="export-bank">Export bank JSON</button>
-        <label class="btn ghost">Import JSON<input id="import-json" type="file" accept="application/json" hidden /></label>
-        <button class="btn ghost" data-act="reset-progress">Reset progress</button>
-        <button class="btn warn sm" data-act="wipe">Wipe bank</button>
+      <div class="card" style="margin:1.2rem 0">
+        <p class="eyebrow" style="margin:0">Laptop ↔ iPad</p>
+        <p class="display" style="margin:.35rem 0 0;font-size:1.25rem">Move a transfer file</p>
+        <p class="small muted">Save on the laptop, AirDrop or put it in iCloud Drive / Files, then restore here. That copies courses, questions, scores, and flags. It replaces what is on this device.</p>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="export-transfer">Save transfer file</button>
+          <label class="btn sec">Restore transfer file<input id="restore-json" type="file" accept="application/json,.json" hidden /></label>
+          <button class="btn ghost" type="button" data-act="export-bank">Questions only</button>
+          <label class="btn ghost">Merge questions<input id="import-json" type="file" accept="application/json,.json" hidden /></label>
+        </div>
+        <div class="row" style="margin-top:.55rem">
+          <button class="btn ghost" type="button" data-act="reset-progress">Reset progress</button>
+          <button class="btn warn sm" type="button" data-act="wipe">Wipe bank</button>
+        </div>
       </div>
       <h2 style="font-size:1.3rem">By year</h2>
       <div class="grid-3">${YEARS.map(yl => {
@@ -1123,6 +1132,27 @@
       };
     }
     if (csvPending && csvPending.batches && csvPending.batches.length) paintCsvPreview();
+    const restore = document.getElementById("restore-json");
+    if (restore) restore.onchange = () => {
+      const f = restore.files && restore.files[0]; restore.value = "";
+      if (!f) return;
+      f.text().then(text => {
+        const dump = JSON.parse(text);
+        if (!dump.courses || !dump.questions) throw new Error("bad");
+        if (!confirm("Replace everything on this device with this transfer file? Courses, questions, and progress will match the other device.")) return;
+        state.theme = dump.theme || state.theme;
+        state.courses = dump.courses;
+        state.questions = dump.questions;
+        state.attempts = dump.attempts || [];
+        state.itemStats = dump.itemStats || {};
+        state.session = dump.session || null;
+        state.seeded = true;
+        document.documentElement.classList.toggle("light", state.theme==="light");
+        save();
+        toast("This device now matches the transfer file.");
+        go("#/");
+      }).catch(() => toast("That file is not a Plexus transfer."));
+    };
     const imp = document.getElementById("import-json");
     if (imp) imp.onchange = () => {
       const f = imp.files && imp.files[0]; if (!f) return;
@@ -1374,6 +1404,24 @@
       startSession({ title:ses.title, kind:ses.kind, courseId:ses.courseId, year:ses.year, quarter:ses.quarter, week:ses.week, coverage:ses.coverage,
         mode:ses.mode, shuffle:true, timerSeconds:ses.timerSeconds, count:0, questionIds: ses.items.map(i=>i.questionId) });
       go("#/quiz"); return;
+    }
+    if (act==="export-transfer"){
+      const stamp = new Date().toISOString().slice(0,10);
+      const dump = {
+        kind: "plexus-transfer",
+        version: 2,
+        exportedAt: Date.now(),
+        theme: state.theme,
+        courses: state.courses,
+        questions: state.questions,
+        attempts: state.attempts,
+        itemStats: state.itemStats,
+        session: state.session,
+        seeded: true
+      };
+      download("plexus-transfer-"+stamp+".json", JSON.stringify(dump), "application/json");
+      toast("Transfer file saved. Open it on the other device via Progress.");
+      return;
     }
     if (act==="export-bank"){
       download("plexus-bank.json", JSON.stringify({version:1, exportedAt:Date.now(), courses:state.courses, questions:state.questions}, null, 2), "application/json");
