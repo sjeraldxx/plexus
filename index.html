@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plexus</title>
+  <meta name="description" content="Year-level medical question bank. Courses, quarters, weekly coverage, a 60-second timer, and CSV import. Progress stays on this device." />
+  <meta name="theme-color" content="#0B0E10" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0e10;
+      --surface: #121618;
+      --elevated: #181d20;
+      --fg: #ecefed;
+      --muted: #8a9390;
+      --subtle: #5d6663;
+      --accent: #8fb4b0;
+      --accent-fg: #0b0e10;
+      --border: rgba(236,239,237,.1);
+      --correct: #6f9e7c;
+      --wrong: #c07a72;
+      --flag: #c4b59a;
+      --shadow: 0 0 0 1px rgba(236,239,237,.08);
+      --shadow-h: 0 0 0 1px rgba(236,239,237,.16);
+      color-scheme: dark;
+    }
+    html.light {
+      --bg: #f3f1eb;
+      --surface: #faf9f5;
+      --elevated: #fff;
+      --fg: #161a18;
+      --muted: #5c6562;
+      --subtle: #8a918e;
+      --accent: #3d6b68;
+      --accent-fg: #f3f1eb;
+      --border: rgba(22,26,24,.1);
+      --correct: #2f6b48;
+      --wrong: #9a4038;
+      --flag: #8a7048;
+      --shadow: 0 0 0 1px rgba(22,26,24,.06), 0 1px 2px -1px rgba(22,26,24,.06);
+      --shadow-h: 0 0 0 1px rgba(22,26,24,.1), 0 2px 6px 0 rgba(22,26,24,.06);
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    body {
+      font-family: Figtree, ui-sans-serif, system-ui, sans-serif;
+      min-height: 100dvh;
+      line-height: 1.5;
+    }
+    h1,h2,h3,.display { font-family: Fraunces, "Times New Roman", serif; font-weight: 600; letter-spacing: -.02em; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    header.app {
+      position: sticky; top: 0; z-index: 20;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 85%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .bar {
+      max-width: 72rem; margin: 0 auto; height: 3.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1rem;
+    }
+    .brand { display: flex; align-items: center; gap: .65rem; font-size: 1.15rem; }
+    .nav { display: flex; align-items: center; gap: .25rem; }
+    .nav a, .icon-btn {
+      display: inline-flex; align-items: center; height: 2.25rem; padding: 0 .75rem;
+      border-radius: .5rem; color: var(--muted); border: 0; background: transparent; cursor: pointer;
+    }
+    .nav a:hover, .icon-btn:hover, .nav a.on { background: var(--elevated); color: var(--fg); }
+    main { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+    main.narrow { max-width: 48rem; }
+    .eyebrow { font-size: .75rem; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
+    .hero { font-size: clamp(2rem, 6vw, 3.6rem); line-height: 1.05; margin: .75rem 0 0; }
+    .lead { max-width: 36rem; color: var(--muted); font-size: 1.05rem; }
+    .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .badge {
+      display: inline-flex; align-items: center; height: 1.6rem; padding: 0 .55rem;
+      border-radius: 999px; font-size: .72rem; letter-spacing: .04em;
+      background: var(--elevated); color: var(--muted); box-shadow: var(--shadow);
+    }
+    .badge.accent { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+    .card {
+      background: var(--surface); border-radius: 1.5rem; padding: 1.35rem 1.4rem;
+      box-shadow: var(--shadow); transition: box-shadow .15s;
+    }
+    a.card:hover, button.card:hover { box-shadow: var(--shadow-h); }
+    .grid-3 { display: grid; gap: .75rem; }
+    .grid-2 { display: grid; gap: .75rem; }
+    @media (min-width: 720px) { .grid-2 { grid-template-columns: 1fr 1fr; } .grid-3 { grid-template-columns: 1fr 1fr 1fr; } }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      height: 2.5rem; padding: 0 1rem; border-radius: .75rem; border: 0; cursor: pointer;
+      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .9rem;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.sec { background: var(--elevated); color: var(--fg); box-shadow: var(--shadow); }
+    .btn.ghost { background: transparent; color: var(--muted); }
+    .btn.ghost:hover { color: var(--fg); background: var(--elevated); }
+    .btn.sm { height: 2rem; padding: 0 .7rem; font-size: .8rem; border-radius: .6rem; }
+    .btn.warn { background: color-mix(in srgb, var(--wrong) 22%, transparent); color: var(--wrong); }
+    .muted { color: var(--muted); } .subtle { color: var(--subtle); } .small { font-size: .875rem; }
+    .stack { display: grid; gap: .65rem; }
+    label.field { display: grid; gap: .3rem; font-size: .8rem; color: var(--muted); }
+    input[type=text], input[type=number], select, textarea {
+      background: var(--elevated); border: 1px solid var(--border); border-radius: .7rem;
+      padding: .65rem .8rem; outline: none; width: 100%;
+    }
+    textarea { min-height: 5.5rem; resize: vertical; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 40;
+      display: flex; align-items: flex-end; justify-content: center; padding: 1rem;
+    }
+    @media (min-width: 720px) { .overlay { align-items: center; } }
+    .modal { background: var(--surface); border-radius: 1.25rem; width: min(36rem, 100%); max-height: 90dvh; overflow: auto; padding: 1.25rem; box-shadow: var(--shadow-h); }
+    .opt {
+      display: flex; gap: .8rem; align-items: flex-start; width: 100%; text-align: left;
+      background: var(--elevated); border: 1px solid transparent; border-radius: 1rem;
+      padding: .9rem 1rem; cursor: pointer; color: var(--fg);
+    }
+    .opt:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+    .opt .ltr {
+      flex: none; width: 1.7rem; height: 1.7rem; border-radius: .5rem;
+      display: grid; place-items: center; background: var(--surface); font-size: .8rem; font-weight: 600;
+    }
+    .opt.ok { background: color-mix(in srgb, var(--correct) 16%, var(--elevated)); }
+    .opt.bad { background: color-mix(in srgb, var(--wrong) 16%, var(--elevated)); }
+    .opt.pick { outline: 1px solid var(--accent); }
+    .opt:disabled { cursor: default; }
+    .progress { height: .35rem; background: var(--elevated); border-radius: 99px; overflow: hidden; }
+    .progress > span { display: block; height: 100%; background: var(--accent); }
+    .timer {
+      width: 3.4rem; height: 3.4rem; border-radius: 50%;
+      display: grid; place-items: center; font-variant-numeric: tabular-nums; font-size: .85rem; font-weight: 600;
+      background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--elevated) 0);
+    }
+    .timer > span { width: 2.55rem; height: 2.55rem; border-radius: 50%; background: var(--bg); display: grid; place-items: center; }
+    .timer.low { color: var(--wrong); background: conic-gradient(var(--wrong) calc(var(--p) * 1%), var(--elevated) 0); }
+    .rationale { background: var(--elevated); border-radius: 1rem; padding: 1rem 1.1rem; }
+    .toast {
+      position: fixed; bottom: 1rem; right: 1rem; z-index: 50;
+      background: var(--elevated); color: var(--fg); padding: .7rem 1rem; border-radius: .8rem;
+      box-shadow: var(--shadow-h); font-size: .875rem;
+    }
+    .switch { display: flex; align-items: center; gap: .55rem; font-size: .875rem; }
+    .switch input { accent-color: var(--accent); width: 1.05rem; height: 1.05rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th { text-align: left; color: var(--subtle); font-weight: 500; padding: .45rem .3rem; }
+    td { padding: .5rem .3rem; border-top: 1px solid var(--border); }
+    .week-row { background: var(--elevated); border-radius: 1rem; padding: .75rem .85rem; }
+    .host ol { padding-left: 1.2rem; color: var(--muted); }
+    .host code { font-family: "IBM Plex Mono", monospace; font-size: .8em; color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="modal"></div>
+  <div id="toast" class="toast" hidden></div>
+  <script>
+(function () {
+  "use strict";
+  const STORE = "plexus-pages-v1";
+  const LETTERS = ["A","B","C","D","E","F"];
+  const YEARS = ["YL1","YL2","YL3"];
+  const YEAR_LABELS = { YL1: "Year 1", YL2: "Year 2", YL3: "Year 3" };
+  const YEAR_BLURBS = {
+    YL1: "Basic sciences — structure, function, and the molecules underneath both.",
+    YL2: "Mechanisms of disease and the drugs that meet them.",
+    YL3: "Clerkship stems. Put the science next to a patient."
+  };
+
+  const SEED = [
+    {id:"sample_anat_yl1",year:"YL1",name:"Gross Anatomy",code:"ANAT",blurb:"Back, limbs, and thorax — the map you will keep using on the wards.",qs:[
+      [1,1,"Back and spinal cord","A 24-year-old rower presents with a winged scapula after a stretch injury. Which nerve is most likely injured?",["Dorsal scapular nerve","Long thoracic nerve","Thoracodorsal nerve","Spinal accessory nerve"],1,"The long thoracic nerve (C5–C7) supplies serratus anterior. Paralysis lets the medial border of the scapula lift off the chest wall, especially when the patient pushes forward against a wall."],
+      [1,1,"Back and spinal cord","Which statement about a typical thoracic vertebra is correct?",["The vertebral foramen is triangular and large","The superior articular facets face medially","Costal facets are present on the body and transverse processes","The spinous process is short and bifid"],2,"Thoracic vertebrae carry costal facets for the ribs on the bodies (and often the transverse processes). Cervical vertebrae have triangular foramina and bifid spines; lumbar superior facets face medially."],
+      [1,1,"Upper limb","A midshaft fracture of the humerus is most likely to injure which pair?",["Median nerve and brachial artery","Ulnar nerve and superior ulnar collateral artery","Radial nerve and profunda brachii artery","Axillary nerve and posterior circumflex humeral artery"],2,"In the spiral groove, the radial nerve travels with the profunda brachii. Wrist drop and loss of brachioradialis follow."],
+      [1,2,"Thorax","The sternal angle (of Louis) is a surface landmark for all of the following EXCEPT:",["The T4/T5 intervertebral disc","Bifurcation of the trachea","Beginning and end of the aortic arch","Entrance of the inferior vena cava into the right atrium"],3,"The IVC pierces the diaphragm at T8 and enters the right atrium well below the sternal angle."],
+      [1,2,"Thorax","A penetrating wound at the right sternal border in the 4th intercostal space is most likely to enter which chamber?",["Left atrium","Left ventricle","Right atrium","Right ventricle"],3,"The right ventricle forms most of the anterior (sternocostal) surface of the heart."],
+      [1,2,"Thorax","Which structure is found in the middle mediastinum?",["Thymus","Heart and pericardium","Thoracic duct","Descending thoracic aorta"],1,"The middle mediastinum holds the heart, pericardium, roots of the great vessels, phrenic nerves, and tracheal bifurcation."]
+    ]},
+    {id:"sample_phys_yl1",year:"YL1",name:"Physiology",code:"PHYS",blurb:"Membranes, nerve, and the circuit of the heart.",qs:[
+      [1,1,"Membrane and nerve","The resting membrane potential of a typical neuron is closest to the equilibrium potential of which ion?",["Sodium","Potassium","Calcium","Chloride"],1,"At rest, membrane conductance is dominated by potassium leak channels. E_K is about −90 mV; RMP sits nearby."],
+      [1,1,"Membrane and nerve","Saltatory conduction depends on which structural feature?",["Continuous myelin with no gaps","Nodes of Ranvier with clustered voltage-gated Na+ channels","High cytoplasmic resistance","Absence of Schwann cells"],1,"Voltage-gated Na+ channels cluster at nodes of Ranvier, so the action potential jumps from node to node."],
+      [1,1,"Membrane and nerve","During the upstroke of a neuronal action potential, which statement is true?",["K+ conductance exceeds Na+ conductance","Na+ conductance rises rapidly and the membrane potential approaches E_Na","The Na/K ATPase is the main inward current","Cl− influx depolarizes the cell"],1,"Voltage-gated Na+ channels open, gNa soars, and Vm races toward E_Na (about +60 mV)."],
+      [1,2,"Cardiovascular","The dicrotic notch on the aortic pressure tracing is produced by:",["Mitral valve opening","Aortic valve closure","Peak ventricular ejection","Atrial contraction"],1,"When the aortic valve closes, a brief retrograde flow and elastic recoil of the aorta create the incisura."],
+      [1,2,"Cardiovascular","Which change increases stroke volume by the Frank–Starling mechanism?",["Increased afterload at constant preload","Increased end-diastolic volume","Decreased contractility","Increased heart rate with less filling time"],1,"Greater venous return stretches sarcomeres (higher EDV/preload) and increases stroke volume."],
+      [1,2,"Cardiovascular","Which region of the cardiac conduction system has the slowest conduction velocity?",["Atrial muscle","AV node","His–Purkinje system","Ventricular muscle"],1,"AV nodal delay lets the atria finish emptying. Purkinje fibers are the fastest."]
+    ]},
+    {id:"sample_bioc_yl1",year:"YL1",name:"Biochemistry",code:"BIOC",blurb:"Fuel, reducing power, and the enzymes that gate both.",qs:[
+      [1,1,"Carbohydrate metabolism","The major rate-limiting enzyme of glycolysis is:",["Hexokinase","Phosphofructokinase-1","Pyruvate kinase","Glyceraldehyde-3-phosphate dehydrogenase"],1,"PFK-1 is the committed step. It is inhibited by ATP and citrate and activated by AMP and fructose-2,6-bisphosphate."],
+      [1,1,"Carbohydrate metabolism","NADPH used for fatty-acid synthesis and glutathione reduction is generated primarily by:",["Glycolysis","The pentose phosphate pathway","The urea cycle","β-oxidation in mitochondria"],1,"The oxidative pentose phosphate pathway (G6PD) is the main cytosolic source of NADPH."],
+      [1,1,"Nitrogen metabolism","Which amino acid is purely ketogenic?",["Alanine","Leucine","Aspartate","Glutamate"],1,"Leucine and lysine are purely ketogenic. Alanine, aspartate, and glutamate are glucogenic."],
+      [1,2,"Bioenergetics","An uncoupler of oxidative phosphorylation (e.g. 2,4-dinitrophenol) will:",["Stop oxygen consumption and raise ATP","Increase oxygen consumption and decrease ATP synthesis","Block electron flow at Complex I","Inhibit ATP synthase directly like oligomycin"],1,"Uncouplers leak protons. ETC races (O2 use rises) but ATP synthesis falls."]
+    ]},
+    {id:"sample_micr_yl2",year:"YL2",name:"Microbiology",code:"MICR",blurb:"Who the organism is, and what its toxins actually do.",qs:[
+      [1,1,"Gram-positive cocci","A catalase-positive, coagulase-positive gram-positive coccus isolated from an abscess is most consistent with:",["Streptococcus pyogenes","Staphylococcus aureus","Enterococcus faecalis","Staphylococcus epidermidis"],1,"Staphylococci are catalase-positive. Coagulase separates S. aureus from coagulase-negative staphylococci."],
+      [1,1,"Gram-positive cocci","Which organism is acid-fast because of mycolic acids in the cell wall?",["Nocardia brasiliensis only","Mycobacterium tuberculosis","Corynebacterium diphtheriae","Listeria monocytogenes"],1,"Mycobacteria retain carbol fuchsin after acid-alcohol because of waxy mycolic acids."],
+      [1,2,"Bacterial toxins","Lipopolysaccharide (endotoxin) is a structural component of:",["Gram-positive cell walls","The outer membrane of gram-negative bacteria","Fungal ergosterol","Mycoplasma plasma membranes"],1,"LPS lives in the outer membrane of gram-negatives. Lipid A can drive septic shock."],
+      [1,2,"Bacterial toxins","Tetanospasmin produces spastic paralysis by:",["Blocking acetylcholine release at the neuromuscular junction","Blocking release of glycine and GABA in the spinal cord","ADP-ribosylation of Gi","Forming pores in motor neurons"],1,"Tetanus toxin cleaves synaptobrevin in inhibitory interneurons. Botulinum toxin blocks ACh at the NMJ."]
+    ]},
+    {id:"sample_phar_yl2",year:"YL2",name:"Pharmacology",code:"PHAR",blurb:"What the body does to the drug, and what the receptor does next.",qs:[
+      [1,1,"Pharmacokinetics","Zero-order elimination means:",["A constant fraction of drug is removed per unit time","A constant amount of drug is removed per unit time","Clearance increases as concentration rises","Half-life is independent of dose for all drugs"],1,"Zero-order: a fixed amount per time (phenytoin, ethanol, high-dose aspirin) because pathways are saturated."],
+      [1,1,"Pharmacokinetics","Volume of distribution (Vd) is calculated as:",["Clearance × half-life","Amount of drug in the body / plasma concentration","Dose × bioavailability","AUC / dose"],1,"Vd = amount in body / plasma concentration. A large Vd means extensive tissue binding."],
+      [1,2,"Receptors","Which receptor is a ligand-gated ion channel?",["β1-adrenergic receptor","Nicotinic acetylcholine receptor","Insulin receptor","Glucocorticoid receptor"],1,"Nicotinic ACh receptors are ionotropic. β1 is Gs-coupled; insulin is a receptor tyrosine kinase."],
+      [1,2,"Receptors","First-pass metabolism of an oral drug occurs primarily in the:",["Kidney","Liver","Lung","Skin"],1,"Portal blood from the gut goes to the liver before the systemic circulation."]
+    ]},
+    {id:"sample_path_yl2",year:"YL2",name:"Pathology",code:"PATH",blurb:"Injury, death, and the patterns that name the disease.",qs:[
+      [1,1,"Cell injury","Which finding is a hallmark of irreversible cell injury?",["Cellular swelling","Fatty change","Membrane damage with mitochondrial densities","Depletion of glycogen"],2,"Irreversible injury: severe membrane damage, mitochondrial amorphous densities, and nuclear pyknosis/karyorrhexis/karyolysis."],
+      [1,1,"Cell injury","Caseous necrosis is classically associated with:",["Myocardial infarction","Tuberculous granulomas","Acute pancreatitis","Abscesses from pyogenic bacteria"],1,"Caseous necrosis is the necrotic core of granulomas, especially tuberculosis."],
+      [1,2,"Apoptosis and free radicals","Apoptosis, unlike necrosis, is characterized by:",["Always being pathologic","An inflammatory infiltrate of neutrophils","Caspase activation and an intact plasma membrane until late","Enzymatic membrane digestion of neighboring cells"],2,"Apoptosis is programmed, caspase-driven, and does not leak contents, so inflammation is absent."],
+      [1,2,"Apoptosis and free radicals","Which antioxidant enzyme converts superoxide to hydrogen peroxide?",["Catalase","Superoxide dismutase","Glutathione peroxidase","NADPH oxidase"],1,"SOD: O2•− → H2O2. Catalase and glutathione peroxidase then clear H2O2."]
+    ]},
+    {id:"sample_im_yl3",year:"YL3",name:"Internal Medicine",code:"IM",blurb:"Chest pain, breath, and the first move at the bedside.",qs:[
+      [1,1,"Cardiology","A 68-year-old man has a harsh crescendo–decrescendo systolic murmur at the right upper sternal border radiating to the carotids. The most likely lesion is:",["Mitral regurgitation","Aortic stenosis","Aortic regurgitation","Mitral stenosis"],1,"AS is a systolic ejection murmur at the RUSB that radiates to the carotids."],
+      [1,1,"Cardiology","In ST-elevation myocardial infarction, the underlying coronary lesion is typically:",["Partial thrombosis with demand ischemia","Complete acute thrombotic occlusion of an epicardial artery","Coronary vasospasm without plaque","Chronic total occlusion with collaterals only"],1,"STEMI is usually an occlusive thrombus on a ruptured plaque. Immediate reperfusion is the priority."],
+      [1,2,"Pulmonology","The most common bacterial cause of community-acquired pneumonia in adults is:",["Staphylococcus aureus","Streptococcus pneumoniae","Klebsiella pneumoniae","Mycoplasma pneumoniae"],1,"S. pneumoniae remains the leading typical pathogen of CAP."],
+      [1,2,"Pulmonology","A patient with COPD presents with acute dyspnea. ABG shows pH 7.28, PaCO2 68 mmHg, HCO3− 32 mEq/L. The acid–base disorder is:",["Uncompensated metabolic acidosis","Acute respiratory acidosis on chronic respiratory acidosis","Metabolic alkalosis","Uncompensated respiratory alkalosis"],1,"Chronic CO2 retainers have elevated HCO3−. An acute rise in PaCO2 drops pH — acute-on-chronic respiratory acidosis."]
+    ]},
+    {id:"sample_surg_yl3",year:"YL3",name:"Surgery",code:"SURG",blurb:"Belly, chest, and the decision that cannot wait.",qs:[
+      [1,1,"Acute abdomen","The most common cause of small-bowel obstruction in a patient with prior laparotomy is:",["Hernia","Adhesions","Neoplasm","Intussusception"],1,"Postoperative adhesions are the leading cause of SBO in adults with surgical scars."],
+      [1,1,"Acute abdomen","Charcot’s triad of right-upper-quadrant pain, jaundice, and fever is classic for:",["Acute cholecystitis","Ascending cholangitis","Acute pancreatitis","Hepatic abscess only"],1,"Charcot’s triad indicates biliary obstruction plus infection. Urgent decompression plus antibiotics."],
+      [1,2,"Trauma and thorax","Immediate management of tension pneumothorax is:",["CT of the chest before any intervention","Needle decompression followed by tube thoracostomy","Pericardiocentesis","Emergency thoracotomy in the ED for every case"],1,"Tension pneumothorax is a clinical diagnosis. Decompress then place a chest tube."],
+      [1,2,"Trauma and thorax","Courvoisier’s sign (painless, palpable gallbladder) most strongly suggests:",["Acute calculous cholecystitis","Malignant obstruction of the distal bile duct","Biliary colic from a small stone","Amoebic liver abscess"],1,"A chronically obstructed, non-inflamed gallbladder distends — typically periampullary or pancreatic-head carcinoma."]
+    ]},
+    {id:"sample_ob_yl3",year:"YL3",name:"Obstetrics & Gynecology",code:"OBGY",blurb:"Pregnancy, bleeding, and the numbers you must not miss.",qs:[
+      [1,1,"Hypertensive disorders","Preeclampsia is defined as new-onset hypertension after 20 weeks plus:",["Dependent ankle edema alone","Proteinuria or evidence of end-organ injury","A previous history of migraine","Glycosuria"],1,"Preeclampsia: BP ≥ 140/90 after 20 weeks with proteinuria or signs of organ injury. Edema alone is not diagnostic."],
+      [1,1,"Hypertensive disorders","The most common cause of primary postpartum hemorrhage is:",["Retained placenta","Uterine atony","Genital tract laceration","Inherited coagulopathy"],1,"The four T’s: tone, trauma, tissue, thrombin. Atony is by far the most common."],
+      [1,2,"Antenatal care","The recommended daily folic acid dose to prevent neural-tube defects in a woman without a prior affected pregnancy is:",["40 micrograms","400 micrograms","4 milligrams","40 milligrams"],1,"Routine prevention: 400 micrograms (0.4 mg) daily, starting before conception. Prior NTD: 4 mg."],
+      [1,2,"Antenatal care","Hegar’s sign in early pregnancy refers to:",["Bluish discoloration of the vagina and cervix","Softening of the uterine isthmus","Pigmentation of the midline abdomen","Perception of fetal movements by the mother"],1,"Hegar: softening of the isthmus. Chadwick: bluish vagina/cervix."]
+    ]}
+  ];
+
+  function uid(p){ return p + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":"&#39;"}[c])); }
+  function pct(n,d){ return d<=0 ? 0 : Math.round(n/d*100); }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function fmtElapsed(ms){ const s=Math.max(0,Math.floor(ms/1000)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+
+  function buildSeed(){
+    const courses=[], questions=[], now=1700000000000;
+    SEED.forEach(c => {
+      courses.push({id:c.id,year:c.year,name:c.name,code:c.code,blurb:c.blurb,createdAt:now,sample:true});
+      c.qs.forEach((q,i) => {
+        questions.push({id:c.id+"_q"+(i+1),courseId:c.id,quarter:q[0],week:q[1],coverage:q[2],stem:q[3],options:q[4],correctIndex:q[5],rationale:q[6],createdAt:now+i,sample:true});
+      });
+    });
+    return {courses, questions};
+  }
+
+  function defaultState(){
+    const s = buildSeed();
+    return { theme:"dark", courses:s.courses, questions:s.questions, attempts:[], itemStats:{}, session:null, seeded:true };
+  }
+
+  function load(){
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (!raw) return defaultState();
+      const d = JSON.parse(raw);
+      if (!d.courses || !d.questions) return defaultState();
+      if (!d.seeded || d.courses.length===0) {
+        const s = buildSeed();
+        d.courses = s.courses; d.questions = s.questions; d.seeded = true;
+      }
+      return Object.assign(defaultState(), d);
+    } catch(e){ return defaultState(); }
+  }
+  function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e){} }
+
+  let state = load();
+  if (state.theme === "light") document.documentElement.classList.add("light");
+  else document.documentElement.classList.remove("light");
+
+  let ui = {
+    yearForm: null,
+    courseTarget: { scope:"course", quarter:1, week:1, coverage:null },
+    quizMode: "review",
+    shuffle: true,
+    timerOn: true,
+    confirmFinish: false
+  };
+  let timerIv = null;
+  let toastT = null;
+
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { el.hidden = true; }, 2400);
+  }
+
+  function route(){
+    const h = (location.hash || "#/").replace(/^#/, "") || "/";
+    const parts = h.split("/").filter(Boolean);
+    if (parts.length===0) return {name:"hub"};
+    if (parts[0]==="year" && parts[1]) return {name:"year", yl:parts[1]};
+    if (parts[0]==="course" && parts[1]) return {name:"course", id:parts[1]};
+    if (parts[0]==="quiz") return {name:"quiz"};
+    if (parts[0]==="results") return {name:"results"};
+    if (parts[0]==="progress") return {name:"progress"};
+    if (parts[0]==="hosting") return {name:"hosting"};
+    return {name:"hub"};
+  }
+  function go(hash){ location.hash = hash; }
+
+  function markSvg(){
+    return `<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
+      <rect width="32" height="32" rx="7" fill="var(--elevated)"/>
+      <g fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round">
+        <path d="M16 16 L16 6"/><path d="M16 16 L26 16"/><path d="M16 16 L23 24.5"/><path d="M16 16 L9 24.5"/><path d="M16 16 L6 16"/>
+      </g>
+      <circle cx="16" cy="16" r="4.1" fill="var(--accent)"/>
+      <circle cx="16" cy="6" r="2.15" fill="var(--fg)"/>
+      <circle cx="26" cy="16" r="2.15" fill="var(--correct)"/>
+      <circle cx="23" cy="24.5" r="2.15" fill="var(--wrong)"/>
+      <circle cx="9" cy="24.5" r="2.15" fill="var(--correct)"/>
+      <circle cx="6" cy="16" r="2.15" fill="var(--fg)"/>
+    </svg>`;
+  }
+
+  function shell(inner, wide){
+    const r = route();
+    return `<header class="app"><div class="bar">
+      <a class="brand display" href="#/">${markSvg()}Plexus</a>
+      <nav class="nav">
+        <a href="#/" class="${r.name==="hub"?"on":""}">Hub</a>
+        <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
+        <a href="#/hosting" class="${r.name==="hosting"?"on":""}">Pages</a>
+        <button class="icon-btn" data-act="theme" title="Toggle theme">${state.theme==="light"?"Dark":"Light"}</button>
+      </nav>
+    </div></header>
+    <main class="${wide?"wide":"narrow"}">${inner}</main>`;
+  }
+
+  function yearStats(yl){
+    const cs = state.courses.filter(c => c.year===yl);
+    const qs = state.questions.filter(q => cs.some(c => c.id===q.courseId));
+    return { courses: cs.length, questions: qs.length };
+  }
+  function missedIds(){
+    return state.questions.filter(q => {
+      const s = state.itemStats[q.id];
+      return s && s.wrong + s.timedOut > 0 && s.correct === 0;
+    }).map(q => q.id);
+  }
+  function flaggedIds(){
+    return Object.keys(state.itemStats).filter(id => state.itemStats[id] && state.itemStats[id].flagged);
+  }
+  function courseQs(id){ return state.questions.filter(q => q.courseId===id); }
+  function filterQs(opts){
+    return state.questions.filter(q => {
+      if (opts.ids && !opts.ids.includes(q.id)) return false;
+      if (opts.courseId && q.courseId !== opts.courseId) return false;
+      if (opts.quarter && q.quarter !== opts.quarter) return false;
+      if (opts.week && q.week !== opts.week) return false;
+      if (opts.coverage && q.coverage !== opts.coverage) return false;
+      return true;
+    });
+  }
+  function curriculum(courseId){
+    const qs = courseQs(courseId);
+    return [1,2,3,4].map(quarter => {
+      const qqs = qs.filter(q => q.quarter===quarter);
+      const weekNums = [...new Set(qqs.map(q => q.week))].sort((a,b)=>a-b);
+      const weeks = weekNums.map(week => {
+        const wqs = qqs.filter(q => q.week===week);
+        const cov = [...new Set(wqs.map(q => q.coverage).filter(Boolean))];
+        return { week, count:wqs.length, coverages: cov };
+      });
+      return { quarter, count:qqs.length, weeks };
+    });
+  }
+
+  function scoreSession(ses){
+    let correct=0,wrong=0,timedOut=0,unanswered=0;
+    ses.items.forEach(item => {
+      const ans = ses.answers[item.questionId];
+      if (ses.timedOut.includes(item.questionId) && (ans===null || ans===undefined)) timedOut++;
+      else if (ans===null || ans===undefined) unanswered++;
+      else if (ans===item.correctIndex) correct++;
+      else wrong++;
+    });
+    return { total: ses.items.length, correct, wrong, timedOut, unanswered };
+  }
+
+  function startSession(cfg){
+    const courseMap = Object.fromEntries(state.courses.map(c => [c.id,c]));
+    let pool;
+    if (cfg.questionIds && cfg.questionIds.length){
+      const byId = Object.fromEntries(state.questions.map(q => [q.id,q]));
+      pool = cfg.questionIds.map(id => byId[id]).filter(Boolean);
+    } else {
+      pool = filterQs({ courseId: cfg.courseId, quarter: cfg.quarter, week: cfg.week, coverage: cfg.coverage });
+    }
+    let items = pool.map(q => {
+      const c = courseMap[q.courseId]; if (!c) return null;
+      return { questionId:q.id, courseId:q.courseId, courseName:c.name, courseCode:c.code, year:c.year, quarter:q.quarter, week:q.week, coverage:q.coverage, stem:q.stem, options:q.options.slice(), correctIndex:q.correctIndex, rationale:q.rationale };
+    }).filter(Boolean);
+    if (cfg.shuffle) shuffle(items);
+    if (cfg.count > 0) items = items.slice(0, cfg.count);
+    if (!items.length) return false;
+    const answers={}, remainingMs={};
+    items.forEach(it => { answers[it.questionId]=null; if (cfg.timerSeconds>0) remainingMs[it.questionId]=cfg.timerSeconds*1000; });
+    state.session = {
+      id: uid("ses"), title: cfg.title, kind: cfg.kind, courseId: cfg.courseId||null, year: cfg.year||null,
+      quarter: cfg.quarter||null, week: cfg.week||null, coverage: cfg.coverage||null,
+      mode: cfg.mode, shuffled: !!cfg.shuffle, timerSeconds: cfg.timerSeconds||0,
+      items, answers, timedOut:[], flagged:[], remainingMs, index:0, startedAt: Date.now(), finishedAt:null
+    };
+    save();
+    return true;
+  }
+
+  function finishSession(){
+    const ses = state.session; if (!ses) return;
+    ses.finishedAt = Date.now();
+    const s = scoreSession(ses);
+    state.attempts.unshift({
+      id: ses.id, at: ses.finishedAt, title: ses.title, kind: ses.kind, courseId: ses.courseId, year: ses.year,
+      quarter: ses.quarter, week: ses.week, coverage: ses.coverage, mode: ses.mode,
+      total: s.total, correct: s.correct, wrong: s.wrong + s.unanswered, timedOut: s.timedOut,
+      durationMs: ses.finishedAt - ses.startedAt
+    });
+    ses.items.forEach(item => {
+      const cur = state.itemStats[item.questionId] || {seen:0,correct:0,wrong:0,timedOut:0,lastAt:0,flagged:false};
+      const ans = ses.answers[item.questionId];
+      const timed = ses.timedOut.includes(item.questionId);
+      const copy = Object.assign({}, cur, { seen: cur.seen+1, lastAt: ses.finishedAt });
+      if (timed && (ans===null || ans===undefined)) copy.timedOut++;
+      else if (ans===item.correctIndex) copy.correct++;
+      else copy.wrong++;
+      if (ses.flagged.includes(item.questionId)) copy.flagged = true;
+      state.itemStats[item.questionId] = copy;
+    });
+    save();
+  }
+
+  /* ---------------- CSV ---------------- */
+  function detectDelim(text){
+    const sample = text.split(/\r?\n/).slice(0,6).join("\n");
+    const c=(sample.match(/,/g)||[]).length, s=(sample.match(/;/g)||[]).length, t=(sample.match(/\t/g)||[]).length;
+    if (t>c && t>s) return "\t"; if (s>c) return ";"; return ",";
+  }
+  function parseCsvText(text){
+    const raw = text.replace(/^\uFEFF/,"");
+    const delim = detectDelim(raw);
+    const rows=[]; let row=[], cell="", inQ=false;
+    for (let i=0;i<raw.length;i++){
+      const ch=raw[i], next=raw[i+1];
+      if (inQ){
+        if (ch==='"'){ if(next==='"'){ cell+='"'; i++; } else inQ=false; }
+        else cell+=ch;
+      } else if (ch==='"') inQ=true;
+      else if (ch===delim){ row.push(cell); cell=""; }
+      else if (ch==="\n"){ row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row); row=[]; cell=""; }
+      else if (ch!=="\r") cell+=ch;
+    }
+    row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row);
+    return rows.map(r => r.map(c => c.trim()));
+  }
+  function nHead(h){ return h.trim().toLowerCase().replace(/[\s-]+/g,"_"); }
+  function lookup(map, keys){ for (const k of keys) if (map[k]) return map[k]; return ""; }
+  function splitOptions(v){
+    if (!v) return [];
+    const parts = v.includes("|") ? v.split("|") : v.includes(";") ? v.split(";") : v.split(/\s*\n\s*/);
+    return parts.map(p => p.trim().replace(/^[A-Fa-f][.)]\s*/, "")).filter(Boolean);
+  }
+  function resolveCorrect(correct, options){
+    const raw = correct.trim(); if (!raw) return -1;
+    const letter = raw.replace(/[^A-Za-z0-9]/g,"");
+    if (/^[A-Fa-f]$/.test(letter)) return letter.toUpperCase().charCodeAt(0)-65;
+    if (/^[1-6]$/.test(letter)) return Number(letter)-1;
+    const lower = raw.toLowerCase();
+    let i = options.findIndex(o => o.toLowerCase()===lower);
+    if (i>=0) return i;
+    return options.findIndex(o => o.toLowerCase().includes(lower) || lower.includes(o.toLowerCase()));
+  }
+  function interpretCsv(text){
+    const table = parseCsvText(text);
+    const errors=[];
+    if (!table.length) return {rows:[], errors:[{line:1,message:"File is empty."}]};
+    const STEM=["question","stem","q","item","prompt"];
+    const RAT=["rationale","explanation","explain","discussion","reason"];
+    const COR=["correct","answer","correct_answer","correctanswer","key","ans"];
+    const COV=["coverage","topic","week_coverage","weekcoverage","tag"];
+    const OPT=["options","choices","choices_text"];
+    const COLS=[
+      ["option_a","optiona","a","choice_a","choicea","option1","opt_a","opt1"],
+      ["option_b","optionb","b","choice_b","choiceb","option2","opt_b","opt2"],
+      ["option_c","optionc","c","choice_c","choicec","option3","opt_c","opt3"],
+      ["option_d","optiond","d","choice_d","choiced","option4","opt_d","opt4"],
+      ["option_e","optione","e","choice_e","choicee","option5","opt_e","opt5"]
+    ];
+    const first = table[0].map(nHead);
+    const hasHeader = first.some(h => STEM.includes(h)||COR.includes(h)||RAT.includes(h)||h==="option_a"||h==="options"||h==="a");
+    let headers = first, body = table.slice(1);
+    if (!hasHeader){ headers=["question","option_a","option_b","option_c","option_d","correct","rationale"]; body=table; }
+    const rows=[];
+    body.forEach((cols,i) => {
+      const line = hasHeader ? i+2 : i+1;
+      const map={}; headers.forEach((h,idx)=> map[h]=cols[idx]||"");
+      const stem = lookup(map, STEM);
+      const rationale = lookup(map, RAT);
+      const coverage = lookup(map, COV);
+      const packed = lookup(map, OPT);
+      let options = packed ? splitOptions(packed) : COLS.map(k => lookup(map,k)).filter(Boolean);
+      if (!stem){ errors.push({line,message:"Missing question text."}); return; }
+      if (options.length<2){ errors.push({line,message:"Need at least two options."}); return; }
+      if (options.length>6) options = options.slice(0,6);
+      const ci = resolveCorrect(lookup(map,COR), options);
+      if (ci<0 || ci>=options.length){ errors.push({line,message:'Could not match correct answer. Use A–D or the option text.'}); return; }
+      rows.push({stem, options, correctIndex:ci, rationale, coverage});
+    });
+    return {rows, errors};
+  }
+  function csvEscape(v){ return /[",\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  function questionsToCsv(qs){
+    const header="question,option_a,option_b,option_c,option_d,option_e,correct,rationale,coverage";
+    const lines = qs.map(q => {
+      const opts=q.options.slice(); while(opts.length<5) opts.push("");
+      const letter = LETTERS[q.correctIndex]||"A";
+      return [q.stem,opts[0],opts[1],opts[2],opts[3],opts[4],letter,q.rationale,q.coverage].map(csvEscape).join(",");
+    });
+    return [header,...lines].join("\n");
+  }
+  function download(filename, contents, mime){
+    const blob = new Blob([contents], {type: mime||"text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ---------------- views ---------------- */
+  function viewHub(){
+    const resume = state.session && !state.session.finishedAt && state.session.items.length ? state.session : null;
+    const missed = missedIds();
+    const flagged = flaggedIds();
+    return shell(`
+      <section>
+        <p class="eyebrow">Medical curriculum bank</p>
+        <h1 class="hero">Year, course, quarter, week.</h1>
+        <p class="lead">Build your own bank. Upload a CSV for each week of coverage, then review a week, a quarter, or the whole course — randomized, timed at 60 seconds.</p>
+        <div class="row" style="margin-top:1.2rem">
+          <span class="badge accent">${state.questions.length} items</span>
+          <span class="badge">${state.courses.length} courses</span>
+          <span class="badge">YL1 · YL2 · YL3</span>
+        </div>
+      </section>
+      ${resume ? `<div class="card row" style="margin-top:1.6rem;justify-content:space-between">
+        <div><p class="small muted" style="margin:0">Resume</p>
+        <p class="display" style="margin:.2rem 0 0;font-size:1.15rem">Question ${resume.index+1} of ${resume.items.length}</p>
+        <p class="small muted" style="margin:0">${esc(resume.title)}</p></div>
+        <a class="btn" href="#/quiz">Continue</a>
+      </div>` : ""}
+      ${(missed.length||flagged.length) ? `<div class="row" style="margin-top:1rem">
+        ${missed.length?`<button class="btn sec" data-act="drill-missed">Practice ${missed.length} missed</button>`:""}
+        ${flagged.length?`<button class="btn ghost" data-act="drill-flagged">${flagged.length} flagged</button>`:""}
+      </div>`:""}
+      <div class="grid-3" style="margin-top:1.8rem">
+        ${YEARS.map(yl => {
+          const st = yearStats(yl);
+          return `<a class="card" href="#/year/${yl}" style="min-height:12rem;display:flex;flex-direction:column">
+            <p class="mono eyebrow" style="margin:0">${yl}</p>
+            <h2 style="margin:.6rem 0 0;font-size:1.8rem">${YEAR_LABELS[yl]}</h2>
+            <p class="small muted" style="flex:1">${YEAR_BLURBS[yl]}</p>
+            <p class="small subtle" style="margin:0">${st.courses} course${st.courses===1?"":"s"} · ${st.questions} items</p>
+          </a>`;
+        }).join("")}
+      </div>
+      <div class="card" style="margin-top:1.6rem">
+        <p class="eyebrow" style="margin:0">GitHub Pages</p>
+        <p class="display" style="margin:.4rem 0 0;font-size:1.3rem">This file is the whole app.</p>
+        <p class="small muted">Upload <code class="mono">index.html</code> to a GitHub repo, then Settings → Pages → Deploy from branch. Same idea as StudyMats. <a href="#/hosting" style="color:var(--accent)">Step-by-step</a>.</p>
+      </div>
+      <p class="small subtle" style="margin-top:2rem;max-width:36rem">Teaching items written for Plexus, plus whatever you upload. Not affiliated with the PRC, any medical school, or a review center.</p>
+    `, true);
+  }
+
+  function viewYear(yl){
+    if (!YEARS.includes(yl)) return shell(`<p class="muted">Unknown year level.</p><p><a class="btn" href="#/">Back to hub</a></p>`);
+    const list = state.courses.filter(c => c.year===yl);
+    return shell(`
+      <a class="small muted" href="#/">← Hub</a>
+      <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.8rem">
+        <div>
+          <p class="mono eyebrow" style="margin:0">${yl}</p>
+          <h1 class="hero" style="font-size:2.4rem">${YEAR_LABELS[yl]}</h1>
+          <p class="lead small">${YEAR_BLURBS[yl]}</p>
+        </div>
+        <button class="btn" data-act="new-course" data-year="${yl}">New course</button>
+      </div>
+      ${list.length===0 ? `<div class="card" style="margin-top:1.6rem;text-align:center;padding:2rem">
+        <p class="display" style="font-size:1.3rem;margin:0">No courses yet</p>
+        <p class="small muted">Create a course, then upload a CSV for Week 1 of Quarter 1.</p>
+        <button class="btn" data-act="new-course" data-year="${yl}">Create course</button>
+      </div>` : `<div class="grid-3" style="margin-top:1.5rem">${list.map(c => {
+        const qs = courseQs(c.id);
+        const weeks = new Set(qs.map(q => q.quarter+"-"+q.week)).size;
+        let seen=0,correct=0;
+        qs.forEach(q => { const s=state.itemStats[q.id]; if(s){ seen+=s.seen; correct+=s.correct; } });
+        return `<a class="card" href="#/course/${c.id}" style="display:flex;flex-direction:column">
+          <div class="row" style="justify-content:space-between"><span class="badge accent">${esc(c.code)}</span>
+          <span class="small subtle">${weeks} week${weeks===1?"":"s"}</span></div>
+          <h2 style="margin:.7rem 0 0;font-size:1.45rem">${esc(c.name)}</h2>
+          <p class="small muted" style="flex:1">${esc(c.blurb)}</p>
+          <p class="small subtle" style="margin:0">${qs.length} items${seen?` · ${pct(correct,seen)}% of ${seen} attempts`:""}</p>
+        </a>`;
+      }).join("")}</div>`}
+    `, true);
+  }
+
+  function viewCourse(id){
+    const course = state.courses.find(c => c.id===id);
+    if (!course) return shell(`<p class="muted">That course is not in this bank.</p><p><a class="btn" href="#/">Back to hub</a></p>`);
+    const qs = courseQs(id);
+    const cur = curriculum(id);
+    const t = ui.courseTarget;
+    const pool = filterQs({
+      courseId: id,
+      quarter: t.scope==="course" ? null : t.quarter,
+      week: (t.scope==="week"||t.scope==="coverage") ? t.week : null,
+      coverage: t.scope==="coverage" ? t.coverage : null
+    });
+    const coverages = [...new Set(filterQs({courseId:id, quarter:t.quarter, week:t.week}).map(q=>q.coverage).filter(Boolean))];
+    const sliceLabel = t.scope==="coverage" && t.coverage ? `Q${t.quarter} W${t.week} · ${t.coverage}`
+      : t.scope==="week" ? `Q${t.quarter} · Week ${t.week}`
+      : t.scope==="quarter" ? `Quarter ${t.quarter}` : "Full course";
+    return shell(`
+      <a class="small muted" href="#/year/${course.year}">← ${YEAR_LABELS[course.year]}</a>
+      <div class="row" style="justify-content:space-between;align-items:flex-start;margin-top:.8rem">
+        <div>
+          <div class="row"><span class="badge accent">${esc(course.code)}</span><span class="badge">${course.year}</span><span class="badge">${qs.length} items</span></div>
+          <h1 class="hero" style="font-size:2.4rem">${esc(course.name)}</h1>
+          <p class="lead small">${esc(course.blurb)}</p>
+        </div>
+        <div class="row">
+          <button class="btn sec" data-act="add-q" data-id="${course.id}">Add item</button>
+          <button class="btn ghost" data-act="export-csv" data-id="${course.id}">Export CSV</button>
+          <button class="btn ghost" data-act="delete-course" data-id="${course.id}">Delete</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.4rem">
+        <p class="eyebrow" style="margin:0">Practice</p>
+        <p class="display" style="margin:.35rem 0;font-size:1.25rem">${esc(sliceLabel)} · ${pool.length} items</p>
+        <div class="row" style="margin:.6rem 0">
+          <label class="field" style="min-width:9rem"><span>Slice</span>
+            <select id="scope">
+              <option value="course" ${t.scope==="course"?"selected":""}>Whole course</option>
+              <option value="quarter" ${t.scope==="quarter"?"selected":""}>One quarter</option>
+              <option value="week" ${t.scope==="week"?"selected":""}>One week</option>
+              <option value="coverage" ${t.scope==="coverage"?"selected":""}>Coverage tag</option>
+            </select>
+          </label>
+          <label class="field" style="min-width:7rem"><span>Quarter</span>
+            <select id="quarter" ${t.scope==="course"?"disabled":""}>${[1,2,3,4].map(n=>`<option ${t.quarter===n?"selected":""}>${n}</option>`).join("")}</select>
+          </label>
+          <label class="field" style="min-width:7rem"><span>Week</span>
+            <select id="week" ${t.scope==="course"||t.scope==="quarter"?"disabled":""}>${Array.from({length:16},(_,i)=>i+1).map(n=>`<option ${t.week===n?"selected":""}>${n}</option>`).join("")}</select>
+          </label>
+          <label class="field" style="min-width:10rem"><span>Coverage</span>
+            <select id="coverage" ${t.scope!=="coverage"?"disabled":""}>
+              <option value="">Select tag</option>
+              ${coverages.map(c=>`<option value="${esc(c)}" ${t.coverage===c?"selected":""}>${esc(c)}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <div class="row" style="margin:.4rem 0 1rem">
+          <label class="field"><span>Mode</span>
+            <select id="mode">
+              <option value="review" ${ui.quizMode==="review"?"selected":""}>Review (see rationale)</option>
+              <option value="exam" ${ui.quizMode==="exam"?"selected":""}>Exam (end only)</option>
+              <option value="key" ${ui.quizMode==="key"?"selected":""}>Answer key</option>
+            </select>
+          </label>
+          <label class="switch"><input type="checkbox" id="shuffle" ${ui.shuffle?"checked":""}/> Randomize</label>
+          <label class="switch"><input type="checkbox" id="timerOn" ${ui.timerOn?"checked":""}/> 60s timer</label>
+        </div>
+        <button class="btn" data-act="start-practice" data-id="${course.id}" ${pool.length?"":"disabled"}>Start ${pool.length} item${pool.length===1?"":"s"}</button>
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <p class="eyebrow" style="margin:0">CSV import</p>
+        <p class="small muted">Columns: question, option_a–d, correct, rationale, coverage. Adds directly to the week you pick.</p>
+        <div class="row" style="margin:.7rem 0">
+          <label class="field" style="min-width:7rem"><span>Quarter</span>
+            <select id="csv-q">${[1,2,3,4].map(n=>`<option ${t.quarter===n?"selected":""}>${n}</option>`).join("")}</select>
+          </label>
+          <label class="field" style="min-width:7rem"><span>Week</span>
+            <select id="csv-w">${Array.from({length:16},(_,i)=>i+1).map(n=>`<option ${t.week===n?"selected":""}>${n}</option>`).join("")}</select>
+          </label>
+          <label class="field" style="flex:1"><span>Default coverage (if column empty)</span>
+            <input id="csv-cov" type="text" placeholder="e.g. Upper limb" />
+          </label>
+        </div>
+        <div class="row">
+          <label class="btn sec">Choose CSV<input id="csv-file" type="file" accept=".csv,text/csv,text/plain" hidden /></label>
+          <button class="btn ghost" data-act="csv-template">Download template</button>
+        </div>
+        <div id="csv-preview" style="margin-top:.8rem"></div>
+      </div>
+      <h2 style="margin:1.6rem 0 .6rem;font-size:1.5rem">Four quarters</h2>
+      <div class="grid-2">${cur.map(qtr => `
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h3 style="margin:0">Quarter ${qtr.quarter}</h3>
+            <span class="badge">${qtr.count} items</span>
+          </div>
+          <div class="row" style="margin-top:.6rem">
+            <button class="btn sm ${t.scope==="quarter"&&t.quarter===qtr.quarter?"":"sec"}" data-act="set-slice" data-scope="quarter" data-q="${qtr.quarter}">Review quarter</button>
+            <button class="btn sm ghost" data-act="add-q" data-id="${course.id}" data-q="${qtr.quarter}">Add to Q${qtr.quarter}</button>
+          </div>
+          ${qtr.weeks.length===0?`<p class="small subtle">No weeks uploaded yet.</p>`:`<div class="stack" style="margin-top:.7rem">${qtr.weeks.map(w => `
+            <div class="week-row">
+              <div class="row" style="justify-content:space-between">
+                <button class="btn ghost sm" data-act="set-slice" data-scope="week" data-q="${qtr.quarter}" data-w="${w.week}" style="padding-left:0">Week ${w.week} <span class="muted">${w.count} items</span></button>
+                <button class="btn ghost sm" data-act="delete-week" data-id="${course.id}" data-q="${qtr.quarter}" data-w="${w.week}">Remove week</button>
+              </div>
+              ${w.coverages.length?`<div class="row" style="margin-top:.3rem">${w.coverages.map(c=>`<button class="badge" data-act="set-slice" data-scope="coverage" data-q="${qtr.quarter}" data-w="${w.week}" data-cov="${esc(c)}" style="cursor:pointer;border:0">${esc(c)}</button>`).join("")}</div>`:""}
+            </div>`).join("")}</div>`}
+        </div>`).join("")}</div>
+    `, true);
+  }
+
+  function viewQuiz(){
+    const ses = state.session;
+    if (!ses || !ses.items.length) return shell(`<p class="muted">No active session.</p><p><a class="btn" href="#/">Hub</a></p>`);
+    if (ses.finishedAt) { go("#/results"); return ""; }
+    const item = ses.items[ses.index];
+    const chosen = ses.answers[item.questionId];
+    const timedOut = ses.timedOut.includes(item.questionId);
+    const locked = chosen!==null || timedOut;
+    const revealed = ses.mode==="key" || (ses.mode==="review" && locked) || (timedOut && ses.mode!=="exam");
+    const flagged = ses.flagged.includes(item.questionId);
+    const totalMs = ses.timerSeconds*1000;
+    const left = ses.remainingMs[item.questionId] ?? totalMs;
+    const p = totalMs ? Math.max(0, Math.min(100, (left/totalMs)*100)) : 0;
+    const secs = Math.ceil(left/1000);
+    const progress = ((ses.index+1)/ses.items.length)*100;
+    const isLast = ses.index === ses.items.length-1;
+    return shell(`
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <p class="eyebrow" style="margin:0">${esc(ses.title)}</p>
+          <p class="small muted" style="margin:.2rem 0 0">${item.courseCode} · Q${item.quarter} · Week ${item.week}${item.coverage?" · "+esc(item.coverage):""}</p>
+        </div>
+        <div class="row">
+          ${totalMs && !locked ? `<div class="timer ${secs<=10?"low":""}" style="--p:${p}"><span>${secs}</span></div>` : (timedOut?`<span class="badge">Timed out</span>`:"")}
+          <button class="btn ghost sm" data-act="flag">${flagged?"Flagged":"Flag"}</button>
+        </div>
+      </div>
+      <div class="progress" style="margin:1rem 0"><span style="width:${progress}%"></span></div>
+      <p class="small muted">Question ${ses.index+1} of ${ses.items.length}</p>
+      <h1 class="display" style="font-size:1.45rem;line-height:1.35">${esc(item.stem)}</h1>
+      <div class="stack" style="margin-top:1rem">
+        ${item.options.map((opt,i) => {
+          let cls="opt";
+          if (revealed && i===item.correctIndex) cls+=" ok";
+          else if (revealed && chosen===i && i!==item.correctIndex) cls+=" bad";
+          else if (!revealed && chosen===i) cls+=" pick";
+          return `<button class="${cls}" data-act="answer" data-i="${i}" ${locked?"disabled":""}><span class="ltr">${LETTERS[i]}</span><span>${esc(opt)}</span></button>`;
+        }).join("")}
+      </div>
+      ${revealed ? `<div class="rationale" style="margin-top:1rem">
+        <p class="small" style="margin:0;color:${chosen===item.correctIndex?"var(--correct)":"var(--wrong)"}">${timedOut && chosen===null ? "Time ran out." : chosen===item.correctIndex ? "Correct." : "Incorrect."} Answer ${LETTERS[item.correctIndex]}.</p>
+        <p class="small" style="margin:.4rem 0 0">${esc(item.rationale)}</p>
+      </div>` : ""}
+      <div class="row" style="margin-top:1.2rem;justify-content:space-between">
+        <button class="btn sec" data-act="prev" ${ses.index===0?"disabled":""}>Previous</button>
+        <div class="row">
+          <button class="btn ghost" data-act="ask-finish">End</button>
+          ${isLast ? `<button class="btn" data-act="do-finish">See results</button>` : `<button class="btn" data-act="next">Next</button>`}
+        </div>
+      </div>
+      ${ui.confirmFinish?`<div class="card" style="margin-top:1rem"><p style="margin:0">End this set and score it?</p>
+        <div class="row" style="margin-top:.7rem"><button class="btn" data-act="do-finish">Score now</button>
+        <button class="btn ghost" data-act="cancel-finish">Keep going</button></div></div>`:""}
+    `);
+  }
+
+  function viewResults(){
+    const ses = state.session;
+    if (!ses) return shell(`<p class="muted">No results yet.</p><p><a class="btn" href="#/">Hub</a></p>`);
+    const s = scoreSession(ses);
+    const missed = s.wrong + s.unanswered;
+    const acc = pct(s.correct, s.total);
+    return shell(`
+      <p class="eyebrow">Results</p>
+      <h1 class="hero" style="font-size:2.4rem">${acc}%</h1>
+      <p class="lead small">${esc(ses.title)}</p>
+      <div class="grid-3" style="margin:1.2rem 0">
+        <div class="card"><p class="small muted" style="margin:0">Correct</p><p class="display" style="font-size:1.8rem;margin:.2rem 0 0">${s.correct}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Missed</p><p class="display" style="font-size:1.8rem;margin:.2rem 0 0">${missed}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Timed out</p><p class="display" style="font-size:1.8rem;margin:.2rem 0 0">${s.timedOut}</p></div>
+      </div>
+      <p class="small muted">${fmtElapsed((ses.finishedAt||Date.now())-ses.startedAt)} · ${ses.shuffled?"Shuffled":"In order"} · ${ses.timerSeconds?ses.timerSeconds+"s timer":"No timer"}</p>
+      <div class="row" style="margin:1rem 0">
+        <a class="btn" href="${ses.courseId?"#/course/"+ses.courseId:"#/"}">Back to course</a>
+        <button class="btn sec" data-act="retry">Retry same set</button>
+      </div>
+      <div class="card" style="overflow:auto">
+        <table>
+          <thead><tr><th>#</th><th>Item</th><th>Course</th><th>Q / W</th><th>Yours</th><th>Key</th></tr></thead>
+          <tbody>${ses.items.map((it,i) => {
+            const ans = ses.answers[it.questionId];
+            const timed = ses.timedOut.includes(it.questionId);
+            const ok = ans===it.correctIndex;
+            const yours = timed && ans===null ? "—" : (ans===null?"—":LETTERS[ans]);
+            return `<tr>
+              <td class="mono">${i+1}</td>
+              <td>${esc(it.stem.slice(0,90))}${it.stem.length>90?"…":""}</td>
+              <td>${esc(it.courseCode)}</td>
+              <td>Q${it.quarter} W${it.week}</td>
+              <td style="color:${ok?"var(--correct)":"var(--wrong)"}">${yours}${ok?"": (timed?" to":"")}</td>
+              <td>${LETTERS[it.correctIndex]}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+    `, true);
+  }
+
+  function viewProgress(){
+    let seen=0,correct=0,wrong=0,timedOut=0;
+    Object.values(state.itemStats).forEach(s => { seen+=s.seen; correct+=s.correct; wrong+=s.wrong; timedOut+=s.timedOut; });
+    const missed = missedIds().length, flagged = flaggedIds().length;
+    return shell(`
+      <p class="eyebrow">Progress</p>
+      <h1 class="hero" style="font-size:2.4rem">On this device</h1>
+      <p class="lead small">Attempts, misses, and flags stay in your browser. Export the bank before you clear it.</p>
+      <div class="grid-3" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))">
+        <div class="card"><p class="small muted" style="margin:0">Accuracy</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${pct(correct,seen)}%</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Correct</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${correct}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Misses</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${wrong}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Timed out</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${timedOut}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Flagged</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${flagged}</p></div>
+        <div class="card"><p class="small muted" style="margin:0">Open misses</p><p class="display" style="font-size:1.7rem;margin:.2rem 0 0">${missed}</p></div>
+      </div>
+      <div class="row" style="margin:1rem 0">
+        <button class="btn sec" data-act="export-bank">Export bank JSON</button>
+        <label class="btn ghost">Import JSON<input id="import-json" type="file" accept="application/json" hidden /></label>
+        <button class="btn ghost" data-act="reset-progress">Reset progress</button>
+        <button class="btn warn sm" data-act="wipe">Wipe bank</button>
+      </div>
+      <h2 style="font-size:1.3rem">By year</h2>
+      <div class="grid-3">${YEARS.map(yl => {
+        const st = yearStats(yl);
+        return `<a class="card" href="#/year/${yl}"><p class="mono eyebrow" style="margin:0">${yl}</p>
+          <p class="display" style="margin:.4rem 0 0">${YEAR_LABELS[yl]}</p>
+          <p class="small muted">${st.courses} courses · ${st.questions} items</p></a>`;
+      }).join("")}</div>
+      <h2 style="font-size:1.3rem;margin-top:1.4rem">Recent sessions</h2>
+      ${state.attempts.length===0?`<p class="small muted">No sessions yet.</p>`:`<div class="card" style="overflow:auto"><table>
+        <thead><tr><th>When</th><th>Set</th><th>Scope</th><th>Score</th><th>Time</th></tr></thead>
+        <tbody>${state.attempts.slice(0,30).map(a => `<tr>
+          <td class="small">${new Date(a.at).toLocaleString()}</td>
+          <td>${esc(a.title)}</td>
+          <td class="small">${a.year||"—"} ${a.quarter?("Q"+a.quarter):""} ${a.week?("W"+a.week):""}</td>
+          <td>${a.correct}/${a.total} (${pct(a.correct,a.total)}%)</td>
+          <td>${fmtElapsed(a.durationMs)}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`}
+    `, true);
+  }
+
+  function viewHosting(){
+    return shell(`
+      <p class="eyebrow">GitHub Pages</p>
+      <h1 class="hero" style="font-size:2.4rem">Host this file like StudyMats.</h1>
+      <div class="card host" style="margin-top:1.2rem">
+        <ol>
+          <li>Create a new GitHub repository (example name: <code>plexus</code>).</li>
+          <li>Upload this <code>index.html</code> to the <strong>root</strong> of the repo. Optional: also upload <code>sample-week.csv</code>.</li>
+          <li>Open the repo → <strong>Settings</strong> → <strong>Pages</strong>.</li>
+          <li>Build and deployment: Source = <strong>Deploy from a branch</strong>. Branch = <strong>main</strong> / folder <strong>/ (root)</strong>. Save.</li>
+          <li>After a minute your site is <code>https://YOUR_USERNAME.github.io/plexus/</code>.</li>
+        </ol>
+        <p class="small muted">No build step. Hash routes work on GitHub Pages without a 404 fallback. Progress is stored on each device.</p>
+        <div class="row">
+          <button class="btn" data-act="save-html">Download this file</button>
+          <button class="btn sec" data-act="csv-template">CSV template</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function closeModal(){ document.getElementById("modal").innerHTML = ""; }
+  function openModal(html){ document.getElementById("modal").innerHTML = `<div class="overlay" data-act="close-modal"><div class="modal" data-stop="1">${html}</div></div>`; }
+
+  function modalNewCourse(year){
+    openModal(`<p class="eyebrow" style="margin:0">New course · ${year}</p>
+      <h3 style="margin:.3rem 0 1rem">Four quarters from day one</h3>
+      <div class="stack">
+        <label class="field" for="c-name">Name<input id="c-name" type="text" placeholder="Gross Anatomy" /></label>
+        <label class="field" for="c-code">Code<input id="c-code" type="text" placeholder="ANAT" maxlength="8" /></label>
+        <label class="field" for="c-blurb">Blurb<textarea id="c-blurb" placeholder="What this course covers"></textarea></label>
+      </div>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" data-act="create-course" data-year="${year}">Create</button>
+        <button class="btn ghost" data-act="close-modal">Cancel</button>
+      </div>`);
+  }
+
+  function modalAddQ(courseId, quarter, week){
+    const q = quarter || ui.courseTarget.quarter || 1;
+    const w = week || ui.courseTarget.week || 1;
+    openModal(`<p class="eyebrow" style="margin:0">Add item</p>
+      <h3 style="margin:.3rem 0 1rem">One question, four options</h3>
+      <div class="stack">
+        <label class="field" for="q-stem">Question<textarea id="q-stem"></textarea></label>
+        <label class="field" for="q-a">A<input id="q-a" type="text" /></label>
+        <label class="field" for="q-b">B<input id="q-b" type="text" /></label>
+        <label class="field" for="q-c">C<input id="q-c" type="text" /></label>
+        <label class="field" for="q-d">D<input id="q-d" type="text" /></label>
+        <label class="field" for="q-key">Correct
+          <select id="q-key"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+        </label>
+        <label class="field" for="q-rat">Rationale<textarea id="q-rat"></textarea></label>
+        <div class="row">
+          <label class="field" for="q-q">Quarter<select id="q-q">${[1,2,3,4].map(n=>`<option ${n===q?"selected":""}>${n}</option>`).join("")}</select></label>
+          <label class="field" for="q-w">Week<select id="q-w">${Array.from({length:16},(_,i)=>i+1).map(n=>`<option ${n===w?"selected":""}>${n}</option>`).join("")}</select></label>
+          <label class="field" for="q-cov" style="flex:1">Coverage<input id="q-cov" type="text" placeholder="e.g. Thorax" /></label>
+        </div>
+      </div>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" data-act="save-q" data-id="${courseId}">Save item</button>
+        <button class="btn ghost" data-act="close-modal">Cancel</button>
+      </div>`);
+  }
+
+  function render(){
+    clearInterval(timerIv); timerIv = null;
+    const r = route();
+    const root = document.getElementById("app");
+    let html = "";
+    if (r.name==="hub") html = viewHub();
+    else if (r.name==="year") html = viewYear(r.yl);
+    else if (r.name==="course") html = viewCourse(r.id);
+    else if (r.name==="quiz") html = viewQuiz();
+    else if (r.name==="results") html = viewResults();
+    else if (r.name==="progress") html = viewProgress();
+    else if (r.name==="hosting") html = viewHosting();
+    else html = viewHub();
+    root.innerHTML = html;
+    bind();
+    if (r.name==="quiz") startTimer();
+  }
+
+  function startTimer(){
+    const ses = state.session; if (!ses || ses.finishedAt) return;
+    const item = ses.items[ses.index]; if (!item) return;
+    const chosen = ses.answers[item.questionId];
+    const timedOut = ses.timedOut.includes(item.questionId);
+    if (!ses.timerSeconds || chosen!==null || timedOut) return;
+    const total = ses.timerSeconds*1000;
+    const initial = ses.remainingMs[item.questionId] ?? total;
+    const t0 = Date.now();
+    timerIv = setInterval(() => {
+      const left = Math.max(0, initial - (Date.now()-t0));
+      ses.remainingMs[item.questionId] = left;
+      const ring = document.querySelector(".timer");
+      if (ring){
+        const secs = Math.ceil(left/1000);
+        ring.style.setProperty("--p", String(total? (left/total)*100 : 0));
+        ring.querySelector("span").textContent = String(secs);
+        ring.classList.toggle("low", secs<=10);
+      }
+      if (left<=0){
+        clearInterval(timerIv); timerIv=null;
+        if (!ses.timedOut.includes(item.questionId) && ses.answers[item.questionId]===null){
+          ses.timedOut.push(item.questionId);
+          save();
+          if (ses.mode==="exam"){
+            setTimeout(() => {
+              if (ses.index >= ses.items.length-1){ finishSession(); go("#/results"); }
+              else { ses.index++; save(); render(); }
+            }, 700);
+          } else render();
+        }
+      }
+    }, 100);
+  }
+
+  function bind(){
+    document.getElementById("app").onclick = onClick;
+    const modal = document.getElementById("modal");
+    modal.onclick = (e) => {
+      const t = e.target.closest("[data-act]");
+      if (e.target.dataset && e.target.dataset.act==="close-modal") { closeModal(); return; }
+      if (!t) return;
+      if (t.closest("[data-stop]") && t.dataset.act!=="close-modal" && t.dataset.act!=="create-course" && t.dataset.act!=="save-q") {
+        /* keep */
+      }
+      handleAct(t, e);
+    };
+    const scope = document.getElementById("scope");
+    if (scope){
+      scope.onchange = () => { ui.courseTarget.scope = scope.value; render(); };
+      const q = document.getElementById("quarter");
+      const w = document.getElementById("week");
+      const c = document.getElementById("coverage");
+      if (q) q.onchange = () => { ui.courseTarget.quarter = Number(q.value); render(); };
+      if (w) w.onchange = () => { ui.courseTarget.week = Number(w.value); render(); };
+      if (c) c.onchange = () => { ui.courseTarget.coverage = c.value || null; render(); };
+      const mode = document.getElementById("mode");
+      if (mode) mode.onchange = () => { ui.quizMode = mode.value; };
+      const sh = document.getElementById("shuffle");
+      if (sh) sh.onchange = () => { ui.shuffle = sh.checked; };
+      const tm = document.getElementById("timerOn");
+      if (tm) tm.onchange = () => { ui.timerOn = tm.checked; };
+    }
+    const file = document.getElementById("csv-file");
+    if (file) file.onchange = () => {
+      const f = file.files && file.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => showCsvPreview(String(reader.result));
+      reader.readAsText(f);
+    };
+    const imp = document.getElementById("import-json");
+    if (imp) imp.onchange = () => {
+      const f = imp.files && imp.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const dump = JSON.parse(String(reader.result));
+          if (!dump.courses || !dump.questions) throw new Error("bad");
+          const haveC = new Set(state.courses.map(c=>c.id));
+          const haveQ = new Set(state.questions.map(q=>q.id));
+          let nc=0,nq=0;
+          dump.courses.forEach(c => { if(!haveC.has(c.id)){ state.courses.push(c); nc++; } });
+          dump.questions.forEach(q => { if(!haveQ.has(q.id)){ state.questions.push(q); nq++; } });
+          save(); toast(`Merged ${nc} courses and ${nq} items.`); render();
+        } catch(e){ toast("That file is not a Plexus bank export."); }
+      };
+      reader.readAsText(f);
+    };
+    window.onkeydown = onKey;
+  }
+
+  let csvPending = null;
+  function showCsvPreview(text){
+    const res = interpretCsv(text);
+    csvPending = res;
+    const box = document.getElementById("csv-preview");
+    if (!box) return;
+    box.innerHTML = `<p class="small">${res.rows.length} ready${res.errors.length?`, ${res.errors.length} skipped`:""}.</p>
+      ${res.errors.slice(0,6).map(e=>`<p class="small" style="color:var(--wrong);margin:.2rem 0">Line ${e.line}: ${esc(e.message)}</p>`).join("")}
+      ${res.rows.length?`<button class="btn" data-act="commit-csv">Add ${res.rows.length} to selected week</button>`:""}
+      <div class="stack" style="margin-top:.6rem">${res.rows.slice(0,5).map((r,i)=>`<p class="small" style="margin:0"><span class="mono muted">${i+1}.</span> ${esc(r.stem.slice(0,110))}</p>`).join("")}</div>`;
+  }
+
+  function onClick(e){
+    const t = e.target.closest("[data-act]");
+    if (!t) return;
+    handleAct(t, e);
+  }
+
+  function handleAct(t, e){
+    const act = t.dataset.act;
+    if (act==="theme"){
+      state.theme = state.theme==="light"?"dark":"light";
+      document.documentElement.classList.toggle("light", state.theme==="light");
+      save(); render(); return;
+    }
+    if (act==="close-modal"){ closeModal(); return; }
+    if (act==="new-course"){ modalNewCourse(t.dataset.year); return; }
+    if (act==="create-course"){
+      const name = (document.getElementById("c-name").value||"").trim();
+      const code = (document.getElementById("c-code").value||"").trim().toUpperCase();
+      const blurb = (document.getElementById("c-blurb").value||"").trim();
+      if (!name || !code){ toast("Name and code are required."); return; }
+      const id = uid("crs");
+      state.courses.push({id, year:t.dataset.year, name, code, blurb: blurb||"Custom course.", createdAt:Date.now(), sample:false});
+      save(); closeModal(); toast("Course created."); go("#/course/"+id); return;
+    }
+    if (act==="add-q"){ modalAddQ(t.dataset.id, t.dataset.q ? Number(t.dataset.q) : undefined, t.dataset.w ? Number(t.dataset.w) : undefined); return; }
+    if (act==="save-q"){
+      const stem=(document.getElementById("q-stem").value||"").trim();
+      const opts=["q-a","q-b","q-c","q-d"].map(id => (document.getElementById(id).value||"").trim()).filter(Boolean);
+      const key=document.getElementById("q-key").value;
+      const rationale=(document.getElementById("q-rat").value||"").trim();
+      const quarter=Number(document.getElementById("q-q").value);
+      const week=Number(document.getElementById("q-w").value);
+      const coverage=(document.getElementById("q-cov").value||"").trim();
+      if (!stem || opts.length<2){ toast("Need a stem and at least two options."); return; }
+      const correctIndex = key.charCodeAt(0)-65;
+      if (correctIndex<0 || correctIndex>=opts.length){ toast("Correct option is empty."); return; }
+      state.questions.push({id:uid("q"), courseId:t.dataset.id, quarter, week, coverage, stem, options:opts, correctIndex, rationale, createdAt:Date.now(), sample:false});
+      save(); closeModal(); toast("Item added."); render(); return;
+    }
+    if (act==="delete-course"){
+      if (!confirm("Delete this course and all of its items?")) return;
+      const id=t.dataset.id;
+      const c=state.courses.find(x=>x.id===id);
+      state.courses=state.courses.filter(x=>x.id!==id);
+      state.questions=state.questions.filter(x=>x.courseId!==id);
+      save(); toast("Course removed."); go(c?"#/year/"+c.year:"#/"); return;
+    }
+    if (act==="delete-week"){
+      if (!confirm("Remove every item in this week?")) return;
+      const id=t.dataset.id, q=Number(t.dataset.q), w=Number(t.dataset.w);
+      state.questions=state.questions.filter(x => !(x.courseId===id && x.quarter===q && x.week===w));
+      save(); toast("Week removed."); render(); return;
+    }
+    if (act==="export-csv"){
+      const qs=courseQs(t.dataset.id);
+      const c=state.courses.find(x=>x.id===t.dataset.id);
+      download((c?c.code.toLowerCase():"course")+".csv", questionsToCsv(qs), "text/csv");
+      toast("CSV downloaded."); return;
+    }
+    if (act==="csv-template"){
+      download("sample-week.csv", `question,option_a,option_b,option_c,option_d,correct,rationale,coverage\n"The long thoracic nerve innervates which muscle?","Latissimus dorsi","Serratus anterior","Trapezius","Rhomboid major",B,"The long thoracic nerve (C5–C7) supplies serratus anterior. Injury produces a winged scapula.","Upper limb"\n"Which vertebral level corresponds to the sternal angle?","T2/T3","T4/T5","T6/T7","T8/T9",B,"The sternal angle (of Louis) marks the T4/T5 disc.","Thorax"\n`, "text/csv");
+      return;
+    }
+    if (act==="commit-csv"){
+      if (!csvPending || !csvPending.rows.length) return;
+      const courseId = route().id;
+      const q = Number(document.getElementById("csv-q").value);
+      const w = Number(document.getElementById("csv-w").value);
+      const def = (document.getElementById("csv-cov").value||"").trim();
+      csvPending.rows.forEach(r => {
+        state.questions.push({
+          id: uid("q"), courseId, quarter:q, week:w,
+          coverage: r.coverage || def, stem:r.stem, options:r.options,
+          correctIndex:r.correctIndex, rationale:r.rationale, createdAt:Date.now(), sample:false
+        });
+      });
+      const n = csvPending.rows.length;
+      csvPending=null; save(); toast(`Added ${n} items to Q${q} Week ${w}.`);
+      ui.courseTarget = { scope:"week", quarter:q, week:w, coverage:null };
+      render(); return;
+    }
+    if (act==="set-slice"){
+      ui.courseTarget = { scope:t.dataset.scope, quarter:Number(t.dataset.q)||1, week:Number(t.dataset.w)||1, coverage:t.dataset.cov||null };
+      render(); return;
+    }
+    if (act==="start-practice"){
+      const course = state.courses.find(c=>c.id===t.dataset.id);
+      const tgt = ui.courseTarget;
+      const title = `${course.code} · ${course.name}` + (
+        tgt.scope==="coverage" ? ` · Q${tgt.quarter} W${tgt.week} · ${tgt.coverage}` :
+        tgt.scope==="week" ? ` · Q${tgt.quarter} · Week ${tgt.week}` :
+        tgt.scope==="quarter" ? ` · Quarter ${tgt.quarter}` : " · Full course"
+      );
+      const ok = startSession({
+        title, kind: tgt.scope, courseId: course.id, year: course.year,
+        quarter: tgt.scope==="course"?null:tgt.quarter,
+        week: (tgt.scope==="week"||tgt.scope==="coverage")?tgt.week:null,
+        coverage: tgt.scope==="coverage"?tgt.coverage:null,
+        mode: ui.quizMode, shuffle: ui.shuffle, timerSeconds: ui.timerOn?60:0, count:0
+      });
+      if (!ok){ toast("No items in that slice yet. Upload a week first."); return; }
+      go("#/quiz"); return;
+    }
+    if (act==="drill-missed" || act==="drill-flagged"){
+      const ids = act==="drill-missed" ? missedIds() : flaggedIds();
+      if (!ids.length) return;
+      startSession({ title: act==="drill-missed"?"Missed items":"Flagged items", kind: act==="drill-missed"?"missed":"flagged",
+        courseId:null, year:null, quarter:null, week:null, coverage:null, mode:"review", shuffle:true, timerSeconds:60, count:0, questionIds:ids });
+      go("#/quiz"); return;
+    }
+    if (act==="answer"){
+      const ses=state.session, item=ses.items[ses.index];
+      if (ses.answers[item.questionId]!==null || ses.timedOut.includes(item.questionId)) return;
+      ses.answers[item.questionId] = Number(t.dataset.i);
+      save(); render(); return;
+    }
+    if (act==="flag"){
+      const ses=state.session, id=ses.items[ses.index].questionId;
+      const i=ses.flagged.indexOf(id);
+      if (i>=0) ses.flagged.splice(i,1); else ses.flagged.push(id);
+      save(); render(); return;
+    }
+    if (act==="prev"){ const ses=state.session; if(ses.index>0){ ses.index--; save(); render(); } return; }
+    if (act==="next"){ const ses=state.session; if(ses.index<ses.items.length-1){ ses.index++; save(); render(); } return; }
+    if (act==="ask-finish"){ ui.confirmFinish=true; render(); return; }
+    if (act==="cancel-finish"){ ui.confirmFinish=false; render(); return; }
+    if (act==="do-finish"){ ui.confirmFinish=false; finishSession(); go("#/results"); return; }
+    if (act==="retry"){
+      const ses=state.session; if(!ses) return;
+      startSession({ title:ses.title, kind:ses.kind, courseId:ses.courseId, year:ses.year, quarter:ses.quarter, week:ses.week, coverage:ses.coverage,
+        mode:ses.mode, shuffle:true, timerSeconds:ses.timerSeconds, count:0, questionIds: ses.items.map(i=>i.questionId) });
+      go("#/quiz"); return;
+    }
+    if (act==="export-bank"){
+      download("plexus-bank.json", JSON.stringify({version:1, exportedAt:Date.now(), courses:state.courses, questions:state.questions}, null, 2), "application/json");
+      toast("Bank exported."); return;
+    }
+    if (act==="reset-progress"){
+      if (!confirm("Clear attempts, flags, and item stats? Questions stay.")) return;
+      state.attempts=[]; state.itemStats={}; state.session=null; save(); toast("Progress cleared."); render(); return;
+    }
+    if (act==="wipe"){
+      if (!confirm("Delete every course and question on this device?")) return;
+      const s=buildSeed();
+      state.courses=s.courses; state.questions=s.questions; state.attempts=[]; state.itemStats={}; state.session=null; state.seeded=true;
+      save(); toast("Bank restored to sample items."); go("#/"); return;
+    }
+    if (act==="save-html"){
+      download("index.html", document.documentElement.outerHTML, "text/html");
+      toast("Saved index.html — upload it to GitHub."); return;
+    }
+  }
+
+  function onKey(e){
+    if (route().name!=="quiz") return;
+    const tag=(e.target && e.target.tagName)||"";
+    if (tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
+    const ses=state.session; if(!ses||ses.finishedAt) return;
+    const item=ses.items[ses.index]; if(!item) return;
+    const k=e.key.toLowerCase();
+    const n=item.options.length;
+    if ((k==="a"||k==="1")&&n>0) handleAct({dataset:{act:"answer",i:"0"}});
+    else if ((k==="b"||k==="2")&&n>1) handleAct({dataset:{act:"answer",i:"1"}});
+    else if ((k==="c"||k==="3")&&n>2) handleAct({dataset:{act:"answer",i:"2"}});
+    else if ((k==="d"||k==="4")&&n>3) handleAct({dataset:{act:"answer",i:"3"}});
+    else if (k==="f") handleAct({dataset:{act:"flag"}});
+    else if (k==="arrowright"||k==="j"||k==="n"||(k==="enter"&&!e.shiftKey)) handleAct({dataset:{act: ses.index===ses.items.length-1?"do-finish":"next"}});
+    else if (k==="arrowleft"||k==="k"||k==="p") handleAct({dataset:{act:"prev"}});
+    else if (k==="escape") handleAct({dataset:{act:"ask-finish"}});
+  }
+
+  window.addEventListener("hashchange", render);
+  render();
+})();
+  </script>
+</body>
+</html>
