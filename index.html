@@ -545,11 +545,14 @@
       <section>
         <p class="eyebrow">Medical curriculum bank</p>
         <h1 class="hero">Year, course, quarter, week.</h1>
-        <p class="lead">Build your own bank. Upload a CSV for each week of coverage, then review a week, a quarter, or the whole course — randomized, timed at 60 seconds.</p>
+        <p class="lead">One HTML file. Courses, weeks, CSV import, 60-second timer. Everything — questions, scores, flags — stays in this browser. No account, no server.</p>
         <div class="row" style="margin-top:1.2rem">
           <span class="badge accent">${state.questions.length} items</span>
           <span class="badge">${state.courses.length} courses</span>
-          <span class="badge">YL1 · YL2 · YL3</span>
+          <span class="badge">Saved on this device</span>
+        </div>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" data-act="save-html">Download this HTML file</button>
         </div>
       </section>
       ${resume ? `<div class="card row" style="margin-top:1.6rem;justify-content:space-between">
