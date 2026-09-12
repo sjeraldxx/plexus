@@ -274,6 +274,24 @@
     .opt.bad { background: color-mix(in srgb, var(--wrong) 16%, var(--elevated)); }
     .opt:disabled { cursor: default; }
     .rationale { background: var(--elevated); border-radius: .85rem; padding: .85rem 1rem; font-size: .92rem; }
+    .sit-mon {
+      display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: .7rem; align-items: center;
+      background: var(--surface); border-radius: .9rem; padding: .7rem .95rem; box-shadow: var(--shadow);
+      margin: .75rem 0 1rem;
+    }
+    .sit-mon .timer {
+      font-family: "Source Serif 4", serif; font-size: 1.45rem; font-weight: 650;
+      font-variant-numeric: tabular-nums; min-width: 3.2rem; line-height: 1;
+    }
+    .sit-mon .timer.warn { color: var(--wrong); }
+    .sit-mon .tbar { height: .28rem; background: var(--elevated); border-radius: 99px; overflow: hidden; margin-top: .35rem; }
+    .sit-mon .tbar > span { display: block; height: 100%; background: var(--accent); }
+    .sit-mon .timer.warn + .tbar > span, .sit-mon.warn .tbar > span { background: var(--wrong); }
+    .mode-pill {
+      display: inline-flex; align-items: center; min-height: 1.45rem; padding: 0 .5rem;
+      border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+      background: var(--elevated); color: var(--muted);
+    }
     .toast {
       position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem; z-index: 50;
       background: var(--elevated); color: var(--fg); padding: .75rem 1rem; border-radius: .8rem;
@@ -828,7 +846,7 @@
           <p class="small muted" style="margin:.15rem 0 0">${e.questions.length} item${e.questions.length===1?"":"s"}</p></div>
           <div class="row">
             <a class="btn sm" href="#/exam/${e.id}">Edit</a>
-            <a class="btn sm sec" href="#/sit/${e.id}">Sit</a>
+            <button class="btn sm sec" type="button" data-act="sit-exam" data-exam="${e.id}">Sit</button>
           </div>
         </div>`).join("")}`;
   }
@@ -1166,7 +1184,7 @@
         <div class="row">
           <button class="btn" type="button" data-act="add-q" data-id="${exam.id}">Add item</button>
           <button class="btn sec" type="button" data-act="save-exam-title" data-id="${exam.id}">Save title</button>
-          ${exam.questions.length?`<a class="btn ghost" href="#/sit/${exam.id}">Sit ${exam.questions.length}</a>`:""}
+          ${exam.questions.length?`<button class="btn ghost" type="button" data-act="sit-exam" data-exam="${exam.id}">Sit ${exam.questions.length}</button>`:""}
           <button class="btn warn sm" type="button" data-act="delete-exam" data-id="${exam.id}">Delete exam</button>
         </div>
       </div>
@@ -1424,9 +1442,9 @@
     state.drafts = state.drafts.filter(d => d.examId !== ses.examId);
     state.drafts.unshift({
       examId: ses.examId, title: ses.title, courseId: ses.courseId,
-      shifting: ses.shifting, week: ses.week,
+      shifting: ses.shifting, week: ses.week, mode: ses.mode || "review",
       questions: ses.questions, answers: ses.answers, index: ses.index,
-      startedAt: ses.startedAt, parkedAt: Date.now()
+      startedAt: ses.startedAt, qStartedAt: ses.qStartedAt, parkedAt: Date.now()
     });
   }
   function unfinishedList(){
@@ -1439,7 +1457,6 @@
   }
   function dropUnfinished(examId){
     state.drafts = (state.drafts||[]).filter(d => d.examId!==examId);
-    if (state.session && state.session.examId===examId) state.session = null;
   }
   function startPool(opts){
     parkSession();
@@ -1448,8 +1465,9 @@
     dropUnfinished(opts.examId);
     state.session = {
       examId: opts.examId, title: opts.title, courseId: opts.courseId,
-      shifting: opts.shifting, week: opts.week,
-      questions, answers: questions.map(()=>null), index: 0, startedAt: Date.now(), finishedAt: null
+      shifting: opts.shifting, week: opts.week, mode: opts.mode || "review",
+      questions, answers: questions.map(()=>null), index: 0,
+      startedAt: Date.now(), qStartedAt: Date.now(), finishedAt: null
     };
     save();
     return true;
@@ -1462,9 +1480,9 @@
     state.drafts = (state.drafts||[]).filter(x => x.examId!==examId);
     state.session = {
       examId: d.examId, title: d.title, courseId: d.courseId,
-      shifting: d.shifting, week: d.week,
+      shifting: d.shifting, week: d.week, mode: d.mode || "review",
       questions: d.questions, answers: d.answers, index: d.index||0,
-      startedAt: d.startedAt, finishedAt: null
+      startedAt: d.startedAt, qStartedAt: Date.now(), finishedAt: null
     };
     save();
     return true;
@@ -1564,8 +1582,81 @@
   function startSit2(exam){
     return startPool({
       examId: exam.id, title: exam.title, courseId: exam.courseId,
-      shifting: exam.shifting, week: exam.week, questions: exam.questions
+      shifting: exam.shifting, week: exam.week, questions: exam.questions, mode: exam._mode || "review"
     });
+  }
+  function sitPayload(courseId, s, w){
+    const c = course(courseId);
+    const sets = examsFor(s, w, courseId).filter(e => (e.questions||[]).length);
+    const questions = [];
+    sets.forEach(e => e.questions.forEach(q => questions.push(q)));
+    const examId = sets.length===1 ? sets[0].id : ["pool", courseId, s, w].join("~");
+    return { examId, title: (c?displayName(c):"Course")+" · "+weekLabel(w,s), courseId, shifting:s, week:w, questions };
+  }
+  function askSitModal(attrs){
+    openModal(`<p class="eyebrow">How to sit</p>
+      <h3 style="margin:.3rem 0 .45rem">60 seconds on each item.</h3>
+      <p class="small muted">Individual shows the key and rationale after I pick. Rapid hides both until I finish or end early — then the score is on the items I covered.</p>
+      <div class="stack" style="margin-top:1rem">
+        <button class="btn" type="button" data-act="start-sit" data-mode="review" ${attrs}>Individual review</button>
+        <button class="btn sec" type="button" data-act="start-sit" data-mode="rapid" ${attrs}>Rapid review</button>
+        <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+      </div>`);
+  }
+  function sitStats(ses){
+    let correct=0, covered=0;
+    (ses.answers||[]).forEach((a,i) => {
+      if (a==null) return;
+      covered++;
+      if (a===ses.questions[i].correctIndex) correct++;
+    });
+    return { correct, covered, total: (ses.questions||[]).length };
+  }
+  function closeSit(){
+    const ses = state.session;
+    if (!ses) return;
+    ses.finishedAt = Date.now();
+    dropUnfinished(ses.examId);
+    const st = sitStats(ses);
+    state.attempts.unshift({
+      id: uid("att"), at: ses.finishedAt, title: ses.title, examId: ses.examId,
+      courseId: ses.courseId, shifting: ses.shifting, week: ses.week,
+      correct: st.correct, total: st.total, covered: st.covered, mode: ses.mode||"review"
+    });
+    save(); go("#/results");
+  }
+  function advanceSit(){
+    const ses = state.session;
+    if (!ses) return;
+    if (ses.index >= ses.questions.length-1){ closeSit(); return; }
+    ses.index++;
+    ses.qStartedAt = Date.now();
+    save(); render();
+  }
+  let timerIv = null;
+  function stopTimer(){ if (timerIv){ clearInterval(timerIv); timerIv = null; } }
+  function remainingSec(){
+    const ses = state.session;
+    if (!ses || !ses.qStartedAt) return 60;
+    return Math.max(0, 60 - Math.floor((Date.now() - ses.qStartedAt)/1000));
+  }
+  function startTimer(){
+    stopTimer();
+    const el = document.getElementById("q-timer");
+    const ses = state.session;
+    if (!el || !ses || ses.finishedAt) return;
+    if (ses.answers[ses.index]!=null) return;
+    if (!ses.qStartedAt) ses.qStartedAt = Date.now();
+    const tick = () => {
+      const left = remainingSec();
+      el.textContent = left+"s";
+      el.classList.toggle("warn", left<=10);
+      const bar = document.getElementById("q-tbar");
+      if (bar) bar.style.width = (left/60*100)+"%";
+      if (left<=0){ stopTimer(); handleAct({ dataset: { act: "time-up" } }); }
+    };
+    tick();
+    timerIv = setInterval(tick, 200);
   }
 
   function closeModal(){ document.getElementById("modal").innerHTML = ""; }
@@ -1584,6 +1675,7 @@
   }
 
   function bind(){
+    stopTimer();
     const app = document.getElementById("app");
     app.onclick = (e) => {
       const t = e.target.closest("[data-act]");
@@ -1683,6 +1775,7 @@
     window.onkeydown = (e) => {
       if (e.key==="Escape" && document.querySelector(".overlay")) closeModal();
     };
+    startTimer();
   }
 
   function handleAct(t){
@@ -1947,45 +2040,83 @@
       go("#/sit/"+t.dataset.id); return;
     }
     if (act==="drop-draft"){
-      dropUnfinished(t.dataset.id); save(); toast("Dropped."); render(); return;
+      dropUnfinished(t.dataset.id);
+      if (state.session && state.session.examId===t.dataset.id) state.session = null;
+      save(); toast("Dropped."); render(); return;
     }
     if (act==="sit-week"){
       const courseId = t.dataset.id;
       const s = Number(t.dataset.s);
       const w = Number(t.dataset.w);
-      const c = course(courseId);
-      const sets = examsFor(s, w, courseId).filter(e => (e.questions||[]).length);
-      const questions = [];
-      sets.forEach(e => e.questions.forEach(q => questions.push(q)));
-      if (!questions.length){ toast("No items for that week."); return; }
-      const examId = sets.length===1 ? sets[0].id : ["pool", courseId, s, w].join("~");
+      const payload = sitPayload(courseId, s, w);
+      if (!payload.questions.length){ toast("No items for that week."); return; }
+      askSitModal(`data-id="${courseId}" data-s="${s}" data-w="${w}"`);
+      return;
+    }
+    if (act==="sit-exam"){
+      const exam = state.exams.find(e => e.id===t.dataset.exam);
+      if (!exam || !exam.questions.length){ toast("No items to sit."); return; }
+      askSitModal(`data-exam="${exam.id}"`);
+      return;
+    }
+    if (act==="start-sit"){
+      const mode = t.dataset.mode || "review";
+      closeModal();
+      if (t.dataset.exam){
+        const exam = state.exams.find(e => e.id===t.dataset.exam);
+        if (!exam){ toast("That set is gone."); return; }
+        exam._mode = mode;
+        startSit2(exam);
+        go("#/sit/"+exam.id);
+        return;
+      }
+      const courseId = t.dataset.id;
+      const s = Number(t.dataset.s);
+      const w = Number(t.dataset.w);
+      const payload = sitPayload(courseId, s, w);
+      if (!payload.questions.length){ toast("No items for that week."); return; }
       state.cursor.shifting = s; state.cursor.week = w;
-      startPool({
-        examId, title: (c?displayName(c):"Course")+" · "+weekLabel(w,s),
-        courseId, shifting: s, week: w, questions
-      });
-      go("#/sit/"+examId);
+      startPool(Object.assign({}, payload, { mode }));
+      go("#/sit/"+payload.examId);
       return;
     }
     if (act==="answer"){
       const ses = state.session; if (!ses || ses.answers[ses.index]!=null) return;
-      ses.answers[ses.index] = Number(t.dataset.i); save(); render(); return;
+      ses.answers[ses.index] = Number(t.dataset.i);
+      stopTimer();
+      if (ses.mode==="rapid"){ advanceSit(); return; }
+      save(); render(); return;
     }
-    if (act==="next-q"){ const ses=state.session; if (ses.index<ses.questions.length-1){ ses.index++; save(); render(); } return; }
-    if (act==="prev-q"){ const ses=state.session; if (ses.index>0){ ses.index--; save(); render(); } return; }
-    if (act==="finish-sit"){
+    if (act==="time-up"){
+      const ses = state.session; if (!ses || ses.answers[ses.index]!=null) return;
+      ses.answers[ses.index] = -1;
+      if (ses.mode==="rapid"){ advanceSit(); return; }
+      save(); render(); return;
+    }
+    if (act==="next-q"){
+      const ses=state.session;
+      if (!ses) return;
+      if (ses.index<ses.questions.length-1){ ses.index++; ses.qStartedAt = Date.now(); save(); render(); }
+      return;
+    }
+    if (act==="prev-q"){
+      const ses=state.session;
+      if (!ses || ses.mode==="rapid") return;
+      if (ses.index>0){ ses.index--; ses.qStartedAt = Date.now(); save(); render(); }
+      return;
+    }
+    if (act==="sit-again"){
       const ses = state.session;
-      const exam = { questions: ses.questions };
-      ses.finishedAt = Date.now();
-      dropUnfinished(ses.examId);
-      let correct=0;
-      ses.answers.forEach((a,i) => { if (a===ses.questions[i].correctIndex) correct++; });
-      state.attempts.unshift({
-        id: uid("att"), at: ses.finishedAt, title: ses.title, examId: ses.examId,
-        courseId: ses.courseId, shifting: ses.shifting, week: ses.week,
-        correct, total: ses.questions.length
-      });
-      save(); go("#/results"); return;
+      if (!ses) return;
+      if (String(ses.examId).indexOf("pool~")===0){
+        askSitModal(`data-id="${ses.courseId}" data-s="${ses.shifting}" data-w="${ses.week}"`);
+      } else {
+        askSitModal(`data-exam="${ses.examId}"`);
+      }
+      return;
+    }
+    if (act==="finish-sit" || act==="end-sit"){
+      closeSit(); return;
     }
     if (act==="ask-new-year"){
       const p = state.profile || defaultProfile();
@@ -2067,11 +2198,8 @@
       else if (String(id).indexOf("pool~")===0){
         const p = String(id).split("~");
         const courseId = p[1], s = Number(p[2]), w = Number(p[3]);
-        const sets = examsFor(s, w, courseId).filter(e => (e.questions||[]).length);
-        const questions = [];
-        sets.forEach(e => e.questions.forEach(q => questions.push(q)));
-        const c = course(courseId);
-        if (!startPool({ examId:id, title: (c?displayName(c):"Course")+" · "+weekLabel(w,s), courseId, shifting:s, week:w, questions }))
+        const payload = sitPayload(courseId, s, w);
+        if (!startPool(payload))
           return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/practice">Practice</a></p>`);
       } else return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/practice">Practice</a></p>`);
     }
@@ -2080,42 +2208,60 @@
     const chosen = s.answers[s.index];
     const locked = chosen!==null && chosen!==undefined;
     const isLast = s.index===s.questions.length-1;
+    const rapid = s.mode==="rapid";
+    const st = sitStats(s);
+    const left = locked ? 0 : remainingSec();
+    const timed = chosen===-1;
     return shell(`
       <p class="eyebrow">${esc(s.title)}</p>
-      <p class="small muted">Item ${s.index+1} of ${s.questions.length} · shuffled · <a href="#/practice" class="small muted">Practice</a></p>
+      <div class="sit-mon">
+        <div>
+          <p id="q-timer" class="timer${left<=10 && !locked?" warn":""}" style="margin:0">${locked?"—":left+"s"}</p>
+          <p class="small subtle" style="margin:.15rem 0 0">60s / item</p>
+        </div>
+        <div>
+          <div class="row" style="gap:.45rem">
+            <span class="mode-pill">${rapid?"Rapid":"Individual"}</span>
+            <span class="small muted">Item ${s.index+1} of ${s.questions.length}</span>
+          </div>
+          <p class="small subtle" style="margin:.25rem 0 0">${rapid ? st.covered+" covered" : st.correct+" correct · "+st.covered+" covered"}</p>
+          <div class="tbar"><span id="q-tbar" style="width:${locked?0:(left/60*100)}%"></span></div>
+        </div>
+        <button class="btn ghost sm" type="button" data-act="end-sit">End</button>
+      </div>
       <h1 class="stem">${esc(q.stem)}</h1>
       <div class="stack" style="margin-top:1rem">
         ${q.options.map((opt,i) => {
           let cls="opt";
-          if (locked && i===q.correctIndex) cls+=" ok";
-          else if (locked && chosen===i && i!==q.correctIndex) cls+=" bad";
+          if (!rapid && locked && i===q.correctIndex) cls+=" ok";
+          else if (!rapid && locked && chosen===i && i!==q.correctIndex) cls+=" bad";
           return `<button class="${cls}" data-act="answer" data-i="${i}" ${locked?"disabled":""}><span class="ltr">${LETTERS[i]}</span><span>${esc(opt)}</span></button>`;
         }).join("")}
       </div>
-      ${locked?`<div class="rationale" style="margin-top:1rem">
-        <p class="small" style="margin:0;color:${chosen===q.correctIndex?"var(--correct)":"var(--wrong)"}">${chosen===q.correctIndex?"That’s it.":"Not this one."} Answer ${LETTERS[q.correctIndex]}.</p>
+      ${!rapid && locked?`<div class="rationale" style="margin-top:1rem">
+        <p class="small" style="margin:0;color:${chosen===q.correctIndex?"var(--correct)":"var(--wrong)"}">${chosen===q.correctIndex?"That’s it.": timed?"Time.":"Not this one."} Answer ${LETTERS[q.correctIndex]}.</p>
         <p class="small" style="margin:.4rem 0 0">${esc(q.rationale||"")}</p>
       </div>`:""}
       <div class="row" style="margin-top:1.1rem;justify-content:space-between">
-        <button class="btn sec" type="button" data-act="prev-q" ${s.index===0?"disabled":""}>Previous</button>
-        ${isLast?`<button class="btn" type="button" data-act="finish-sit" ${locked?"":"disabled"}>See score</button>`:
-          `<button class="btn" type="button" data-act="next-q" ${locked?"":"disabled"}>Next</button>`}
+        ${rapid?`<span class="small muted">Key after I stop.</span>`:`<button class="btn sec" type="button" data-act="prev-q" ${s.index===0?"disabled":""}>Previous</button>`}
+        ${isLast?`<button class="btn" type="button" data-act="finish-sit" ${locked || rapid?"":"disabled"}>${rapid?"See score":"See score"}</button>`:
+          rapid?`<span class="small subtle">Next item when I pick, or when the clock hits 0.</span>`:`<button class="btn" type="button" data-act="next-q" ${locked?"":"disabled"}>Next</button>`}
       </div>
     `);
   };
   viewResults = function(){
     const ses = state.session;
     if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/practice">Practice</a></p>`);
-    const total = ses.questions.length;
-    let correct=0;
-    ses.answers.forEach((a,i) => { if (a===ses.questions[i].correctIndex) correct++; });
+    const st = sitStats(ses);
+    const denom = st.covered || 0;
+    const pctCovered = denom ? pct(st.correct, denom) : 0;
     return shell(`
-      <p class="eyebrow">This set</p>
-      <h1 class="hero">${pct(correct,total)}%</h1>
-      <p class="lead">${esc(ses.title)} · ${correct} of ${total}</p>
+      <p class="eyebrow">${ses.mode==="rapid"?"Rapid review":"Individual review"}</p>
+      <h1 class="hero">${pctCovered}%</h1>
+      <p class="lead">${esc(ses.title)} · ${st.correct} correct of ${st.covered} covered${st.covered!==st.total?" · "+(st.total-st.covered)+" not opened":""} · ${st.total} in the set.</p>
       <div class="row" style="margin:1rem 0">
         <a class="btn" href="#/practice">Back to practice</a>
-        <a class="btn sec" href="#/sit/${ses.examId}">Sit it again</a>
+        <button class="btn sec" type="button" data-act="sit-again">Sit it again</button>
         <a class="btn ghost" href="#/c/${ses.courseId}">The week</a>
       </div>
       <div class="card" style="overflow:auto">
@@ -2123,11 +2269,12 @@
           <thead><tr><th>#</th><th>Stem</th><th>Yours</th><th>Key</th></tr></thead>
           <tbody>${ses.questions.map((q,i) => {
             const a = ses.answers[i];
+            const opened = a!=null;
             const ok = a===q.correctIndex;
             return `<tr>
               <td class="mono">${i+1}</td>
-              <td>${esc(q.stem.slice(0,90))}</td>
-              <td style="color:${ok?"var(--correct)":"var(--wrong)"}">${a==null?"—":LETTERS[a]}</td>
+              <td>${esc(q.stem.slice(0,90))}${q.rationale && opened?`<p class="small muted" style="margin:.25rem 0 0">${esc(q.rationale)}</p>`:""}</td>
+              <td style="color:${!opened?"var(--subtle)":ok?"var(--correct)":"var(--wrong)"}">${!opened?"—":a<0?"Time":LETTERS[a]}</td>
               <td>${LETTERS[q.correctIndex]}</td>
             </tr>`;
           }).join("")}</tbody>
