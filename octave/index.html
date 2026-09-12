@@ -175,7 +175,7 @@
       background: var(--elevated); color: var(--muted); font-weight: 600; font-size: .85rem;
     }
     .weekbar button.on { background: var(--accent); color: var(--accent-fg); }
-    .weekbar button.wide { width: auto; min-width: 5.1rem; padding: 0 .7rem; font-size: .72rem; letter-spacing: .02em; }
+    .weekbar button.wide { width: auto; min-width: 6.4rem; padding: 0 .75rem; font-size: .72rem; letter-spacing: .02em; }
     .shiftbar button {
       min-height: 2.15rem; padding: 0 .75rem; border-radius: 999px; border: 0; cursor: pointer;
       background: var(--elevated); color: var(--muted); font-size: .8rem; font-weight: 600;
@@ -183,6 +183,7 @@
     .shiftbar button.on { background: var(--accent); color: var(--accent-fg); }
     .heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .heat { display: grid; grid-template-columns: 4.6rem repeat(9, minmax(2rem, 1fr)); gap: .28rem; align-items: center; min-width: 32rem; }
+    .heat.year { grid-template-columns: 4.6rem repeat(5, minmax(2.4rem, 1fr)); min-width: 22rem; }
     .read { background: var(--surface); border-radius: 1rem; padding: .95rem 1.05rem; box-shadow: var(--shadow); }
     .read .t { font-family: "Source Serif 4", serif; font-size: 1.15rem; margin: .15rem 0 .35rem; }
     .read p { margin: 0; color: var(--muted); font-size: .92rem; }
@@ -280,7 +281,9 @@
   const STORE = "octave-v1";
   const SHIFTINGS = 4;
   const WEEKS = 8;
-  const COMPRE = 9;
+  const LONG = 9;
+  const YEAR = 5;
+  const YEAR_WEEK = 1;
   const LETTERS = ["A","B","C","D"];
   const CONF = ["—", "Lost", "Recognize", "With notes", "Cold", "Exam-ready"];
 
@@ -365,27 +368,43 @@
   function cur(){ return state.cursor; }
   function course(id){ return state.courses.find(c => c.id===id); }
   function examsFor(s,w,c){ return state.exams.filter(e => e.shifting===s && e.week===w && e.courseId===c); }
-  function isCompre(w){ return (w==null?cur().week:w)===COMPRE; }
-  function weekLabel(w){ return isCompre(w) ? "Comprehensive" : ("Week "+w); }
-  function slotLabel(s,w){ return isCompre(w) ? ("Shifting "+s+", comprehensive") : ("Shifting "+s+", week "+w); }
+  function isYear(s){ return (s==null?cur().shifting:Number(s))===YEAR; }
+  function isLong(w,s){ return !isYear(s) && (w==null?cur().week:w)===LONG; }
+  function weekLabel(w,s){
+    if (isYear(s)) return "Compre";
+    if (isLong(w,s)) return "Long exam";
+    return "Week "+w;
+  }
+  function slotLabel(s,w){
+    if (isYear(s)) return "Compre";
+    if (isLong(w,s)) return "Shifting "+s+", long exam";
+    return "Shifting "+s+", week "+w;
+  }
+  function shiftBar(){
+    const s = cur().shifting;
+    return `<div class="row shiftbar" style="margin-top:1rem">
+      ${[1,2,3,4].map(n => `<button type="button" class="${s===n?"on":""}" data-act="set-shift" data-s="${n}">Shifting ${n}</button>`).join("")}
+      <button type="button" class="${s===YEAR?"on":""}" data-act="set-shift" data-s="${YEAR}">Compre</button>
+    </div>`;
+  }
   function interpretConf(n){
     n = Number(n)||0;
     return ({
       0: { title: "Not logged", body: "No score yet. One tap after I read is enough." },
-      1: { title: "Not ready", body: "Still a first pass. I would not sit compre on this." },
+      1: { title: "Not ready", body: "Still a first pass. I would not sit the exam on this." },
       2: { title: "Early", body: "I recognize the lecture. I cannot teach it back yet." },
-      3: { title: "Fair", body: "It holds with notes. Thin for compre until I can do it cold." },
+      3: { title: "Fair", body: "It holds with notes. Thin for the exam until I can do it cold." },
       4: { title: "Good", body: "I can explain it cold. One more pass before the exam." },
       5: { title: "Ready", body: "Exam-ready for this course, on what I logged." }
     })[n];
   }
   function interpretMean(mean, logged, total){
-    if (!logged) return { title: "Not logged", body: "Score each course and I will say whether this block is ready for compre." };
+    if (!logged) return { title: "Not logged", body: "Score each course and I will say whether this block is ready." };
     const thin = Math.max(0, total-logged);
     const tail = thin ? " "+thin+" course"+(thin===1?"":"s")+" still have no score." : "";
-    if (mean < 2) return { title: "Not ready", body: "Mean "+mean.toFixed(1)+" of 5. Not ready for compre."+tail };
+    if (mean < 2) return { title: "Not ready", body: "Mean "+mean.toFixed(1)+" of 5. Not ready for this exam."+tail };
     if (mean < 3) return { title: "Early", body: "Mean "+mean.toFixed(1)+" of 5. Recognition only. Another pass before I treat this as review."+tail };
-    if (mean < 3.7) return { title: "Fair", body: "Mean "+mean.toFixed(1)+" of 5. It holds with notes. Weak courses still decide compre."+tail };
+    if (mean < 3.7) return { title: "Fair", body: "Mean "+mean.toFixed(1)+" of 5. It holds with notes. Weak courses still decide the exam."+tail };
     if (mean < 4.5) return { title: "Good", body: "Mean "+mean.toFixed(1)+" of 5. On track. Lock anything still sitting on notes."+tail };
     return { title: "Ready", body: "Mean "+mean.toFixed(1)+" of 5. This block looks exam-ready on what I logged."+tail };
   }
@@ -462,6 +481,7 @@
     return { meanConf: n? (conf/n) : 0, read: read/count, notes, exams, logged: n };
   }
   function shiftingStats(s){
+    if (isYear(s)) return weekStats(YEAR, YEAR_WEEK);
     let conf=0, n=0, read=0;
     for (let w=1;w<=WEEKS;w++){
       state.courses.forEach(c => {
@@ -582,35 +602,38 @@
   function viewHub(){
     if (!state.named) return viewSetup();
     const {shifting, week} = cur();
-    const ws = weekStats(shifting, week);
+    const year = isYear();
+    const long = isLong(week);
+    const ws = year ? weekStats(YEAR, YEAR_WEEK) : weekStats(shifting, week);
+    const examKind = year ? "this compre" : long ? "this long exam" : "this week";
     return shell(`
       <p class="who">${esc(whoLine() || "Year 2 log")}</p>
       <h1 class="hero">${helloName() ? "Hello, "+esc(helloName())+"." : "Hello."}</h1>
-      <p class="lead">${slotLabel(shifting, week)}. ${isCompre(week)
-        ? "Compre for this shifting — how far the reread got, and whether I would sit it."
-        : (helloName() ? "Lectures this week, how far I got in the text, and whether I can still explain it." : "Put my name under You so this page greets me.")}</p>
-      <div class="row shiftbar" style="margin-top:1rem">
-        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
-      </div>
-      <p class="section">Weeks, then compre</p>
+      <p class="lead">${slotLabel(shifting, week)}. ${year
+        ? "After all four shiftings. One score per course on the year as a whole — not by week."
+        : long
+          ? "Long exam for this shifting. How far the reread got, and whether I would sit it."
+          : (helloName() ? "Lectures this week, how far I got in the text, and whether I can still explain it." : "Put my name under You so this page greets me.")}</p>
+      ${shiftBar()}
+      ${year ? "" : `<p class="section">Weeks, then the long exam</p>
       <div class="weekbar">
         ${Array.from({length:WEEKS},(_,i)=>i+1).map(w => `<button type="button" class="${week===w?"on":""}" data-act="set-week" data-w="${w}">${w}</button>`).join("")}
-        <button type="button" class="wide ${week===COMPRE?"on":""}" data-act="set-week" data-w="${COMPRE}">Compre</button>
-      </div>
+        <button type="button" class="wide ${week===LONG?"on":""}" data-act="set-week" data-w="${LONG}">Long exam</button>
+      </div>`}
       <div class="grid-3" style="margin-top:1rem">
         <div class="stat"><p class="k">Mean confidence</p><p class="v">${ws.logged? ws.meanConf.toFixed(1)+" / 5":"—"}</p><p class="small subtle" style="margin:.15rem 0 0">${ws.logged} of ${state.courses.length} logged</p></div>
-        <div class="stat"><p class="k">${isCompre(week)?"Review":"Reading"}</p><p class="v">${Math.round(ws.read)}%</p><p class="small subtle" style="margin:.15rem 0 0">average across courses</p></div>
-        <div class="stat"><p class="k">Preparedness</p><p class="v">${esc(interpretMean(ws.meanConf, ws.logged, state.courses.length).title)}</p><p class="small subtle" style="margin:.15rem 0 0">${isCompre(week)?"this comprehensive":"this week"}</p></div>
+        <div class="stat"><p class="k">${year||long?"Review":"Reading"}</p><p class="v">${Math.round(ws.read)}%</p><p class="small subtle" style="margin:.15rem 0 0">average across courses</p></div>
+        <div class="stat"><p class="k">Preparedness</p><p class="v">${esc(interpretMean(ws.meanConf, ws.logged, state.courses.length).title)}</p><p class="small subtle" style="margin:.15rem 0 0">${examKind}</p></div>
       </div>
       <div style="margin-top:.7rem">${readCard(ws.meanConf, ws.logged, state.courses.length)}</div>
       <p class="section">${state.courses.length} course${state.courses.length===1?"":"s"}</p>
       ${state.courses.length===0?`<div class="card"><p class="small muted" style="margin:0">No courses yet.</p></div>`:""}
       <div class="grid-7">
         ${state.courses.map(c => {
-          const cell = getCell(shifting, week, c.id);
-          const nEx = examsFor(shifting, week, c.id).length;
+          const cell = getCell(shifting, year ? YEAR_WEEK : week, c.id);
+          const nEx = examsFor(shifting, year ? YEAR_WEEK : week, c.id).length;
           const title = displayName(c);
-          const bits = isCompre(week) ? [
+          const bits = (year||long) ? [
             cell.confidence ? interpretConf(cell.confidence).title : "No confidence",
             cell.reading + "%"
           ] : [
@@ -619,8 +642,10 @@
             nEx ? nEx+" exam" : "",
             (cell.notes||"").trim() ? "notes" : ""
           ].filter(Boolean);
-          const meta = isCompre(week)
-            ? (sourceLine(cell, c) || (cell.confidence ? interpretConf(cell.confidence).body : "Compre review. No lecture list."))
+          const emptyYear = "Year compre. All four shiftings — no weekly lecture list.";
+          const emptyLong = "Long exam. The shifting as a whole — no weekly lecture list.";
+          const meta = (year||long)
+            ? (sourceLine(cell, c) || (cell.confidence ? interpretConf(cell.confidence).body : (year?emptyYear:emptyLong)))
             : (sourceLine(cell, c) || (cell.topics||"").trim() || "No lecture logged");
           return `<a class="card course-row" href="#/c/${c.id}">
             <p class="mono eyebrow code">${esc(c.code)}</p>
@@ -634,7 +659,7 @@
       <div class="row" style="margin-top:.75rem">
         <button class="btn" type="button" data-act="add-course">Add a course</button>
       </div>
-      <p class="small subtle" style="margin-top:1.4rem">Progress reads the same week across all four shiftings, and each compre after week 8.</p>
+      <p class="small subtle" style="margin-top:1.4rem">Each shifting has eight weeks and a long exam. Compre is after all four.</p>
     `, true);
   }
 
@@ -644,7 +669,8 @@
     const {shifting, week} = cur();
     const cell = getCell(shifting, week, id);
     const exams = examsFor(shifting, week, id);
-    const compre = isCompre(week);
+    const year = isYear();
+    const long = isLong(week);
     const inter = interpretConf(cell.confidence);
     const weeklyBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
@@ -677,7 +703,7 @@
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
       <p class="section">High-yield notes</p>
       <div class="card">
-        <textarea id="notes" class="notes" placeholder="What I would want the night before the shifting exam.">${esc(cell.notes)}</textarea>
+        <textarea id="notes" class="notes" placeholder="What I would want the night before the long exam.">${esc(cell.notes)}</textarea>
         <p class="small subtle" style="margin:.5rem 0 0">Saved with this week. Autosaves as I type.</p>
       </div>
       <p class="section">Practice set</p>
@@ -693,11 +719,11 @@
             <a class="btn sm sec" href="#/sit/${e.id}">Sit</a>
           </div>
         </div>`).join("")}`;
-    const compreBlock = `
+    const longBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
-          <p class="eyebrow">Compre reread</p>
-          <p class="small muted" style="margin:0">The shifting as a whole. Not lecture-by-lecture.</p>
+          <p class="eyebrow">Long exam reread</p>
+          <p class="small muted" style="margin:0">This shifting as a whole. Not lecture-by-lecture.</p>
           ${refsEditor(c, cell)}
           <label class="field">How far the reread got ${cell.reading}%
             <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
@@ -707,8 +733,38 @@
           </label>
         </div>
         <div class="card stack">
-          <p class="eyebrow">Would I sit it?</p>
-          <p class="small muted" style="margin:0">One score for this course across the whole shifting.</p>
+          <p class="eyebrow">Would I sit the long exam?</p>
+          <p class="small muted" style="margin:0">One score for this course across this shifting.</p>
+          <div class="conf">
+            ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
+          </div>
+          <p class="small subtle" style="margin:0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
+          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this long exam</button>
+        </div>
+      </div>
+      <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
+      <p class="section">High-yield notes</p>
+      <div class="card">
+        <textarea id="notes" class="notes" placeholder="What I would want the night before the long exam.">${esc(cell.notes)}</textarea>
+        <p class="small subtle" style="margin:.5rem 0 0">Saved with this long exam. Autosaves as I type.</p>
+      </div>
+      <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This is the shifting as a whole.</p>`;
+    const yearBlock = `
+      <div class="grid-2" style="margin-top:1.1rem">
+        <div class="card stack">
+          <p class="eyebrow">Year compre</p>
+          <p class="small muted" style="margin:0">All four shiftings. No weekly topics — how this course sits for the year exam.</p>
+          ${refsEditor(c, cell)}
+          <label class="field">How far the reread got ${cell.reading}%
+            <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
+          </label>
+          <label class="field">Hours on this review
+            <input id="hours" type="number" min="0" max="80" step="0.5" value="${cell.hours||0}" />
+          </label>
+        </div>
+        <div class="card stack">
+          <p class="eyebrow">Would I sit compre?</p>
+          <p class="small muted" style="margin:0">One score for this course across the whole year.</p>
           <div class="conf">
             ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
           </div>
@@ -717,21 +773,26 @@
         </div>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
-      <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This is the shifting as a whole.</p>`;
+      <p class="section">High-yield notes</p>
+      <div class="card">
+        <textarea id="notes" class="notes" placeholder="What I would want walking into compre.">${esc(cell.notes)}</textarea>
+        <p class="small subtle" style="margin:.5rem 0 0">Saved with the year compre. Autosaves as I type.</p>
+      </div>
+      <p class="small subtle" style="margin-top:1rem">This is not a week and not a shifting. It is everything from shifting 1 through 4.</p>`;
     return shell(`
       <a class="small muted" href="#/">← ${esc(slotLabel(shifting, week))}</a>
       <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.7rem">
         <div>
           <p class="eyebrow">${esc(c.code)}</p>
           <h1 class="hero">${esc(displayName(c))}</h1>
-          <p class="lead">${compre ? "Compre after shifting "+shifting+"." : "Week "+week+" of shifting "+shifting+"."}</p>
+          <p class="lead">${year ? "Compre — all four shiftings." : long ? "Long exam after shifting "+shifting+"." : "Week "+week+" of shifting "+shifting+"."}</p>
         </div>
         <div class="row">
           <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Edit title</button>
           <button class="btn warn sm" type="button" data-act="ask-remove-course" data-id="${c.id}">Remove</button>
         </div>
       </div>
-      ${compre ? compreBlock : weeklyBlock}
+      ${year ? yearBlock : long ? longBlock : weeklyBlock}
     `, true);
   }
 
@@ -847,31 +908,37 @@
 
   function viewMap(){
     const {shifting, week} = cur();
+    const year = isYear();
+    const cols = year ? [1,2,3,4,YEAR] : [1,2,3,4,5,6,7,8,LONG];
+    const heatClass = year ? "heat year" : "heat";
     return shell(`
       <p class="eyebrow">Map</p>
-      <h1 class="hero">Shifting ${shifting}.</h1>
-      <p class="lead">Eight weeks and compre. Colour is how well I still know it.</p>
-      <div class="row shiftbar" style="margin-top:1rem">
-        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
-      </div>
+      <h1 class="hero">${year ? "Compre." : "Shifting "+shifting+"."}</h1>
+      <p class="lead">${year ? "Each shifting’s long exam, then the year compre. Colour is how well I still know it." : "Eight weeks and the long exam. Colour is how well I still know it."}</p>
+      ${shiftBar()}
       <div class="card heat-wrap" style="margin-top:1rem">
-        <div class="heat" style="margin-bottom:.4rem">
+        <div class="${heatClass}" style="margin-bottom:.4rem">
           <div></div>
-          ${Array.from({length:WEEKS},(_,i)=>`<div class="small subtle" style="text-align:center">W${i+1}</div>`).join("")}
-          <div class="small subtle" style="text-align:center">C</div>
+          ${year
+            ? [1,2,3,4].map(s => `<div class="small subtle" style="text-align:center">S${s}</div>`).join("") + `<div class="small subtle" style="text-align:center">C</div>`
+            : Array.from({length:WEEKS},(_,i)=>`<div class="small subtle" style="text-align:center">W${i+1}</div>`).join("") + `<div class="small subtle" style="text-align:center">L</div>`}
         </div>
-        ${state.courses.map(c => `<div class="heat" style="margin-bottom:.28rem">
+        ${state.courses.map(c => `<div class="${heatClass}" style="margin-bottom:.28rem">
           <div class="lab" title="${esc(c.name)}">${esc(c.code)}</div>
-          ${[1,2,3,4,5,6,7,8,COMPRE].map(w => {
-            const cell = getCell(shifting,w,c.id);
-            const on = week===w;
-            const lab = isCompre(w) ? "Compre" : ("W"+w);
-            return `<button class="cell c${cell.confidence||0} ${on?"on":""}" data-act="open-cell" data-id="${c.id}" data-w="${w}" title="${esc(c.name)} ${lab}: ${CONF[cell.confidence]}"></button>`;
+          ${cols.map(col => {
+            const cell = year
+              ? (col===YEAR ? getCell(YEAR, YEAR_WEEK, c.id) : getCell(col, LONG, c.id))
+              : getCell(shifting, col, c.id);
+            const on = year ? (col===YEAR) : (week===col);
+            const lab = year ? (col===YEAR ? "Compre" : "S"+col+" long exam") : (col===LONG ? "Long exam" : "W"+col);
+            const openS = year ? (col===YEAR ? YEAR : col) : shifting;
+            const openW = year ? (col===YEAR ? YEAR_WEEK : LONG) : col;
+            return `<button class="cell c${cell.confidence||0} ${on?"on":""}" data-act="open-cell" data-id="${c.id}" data-s="${openS}" data-w="${openW}" title="${esc(c.name)} ${lab}: ${CONF[cell.confidence]}"></button>`;
           }).join("")}
         </div>`).join("")}
         <p class="section" style="margin:1rem 0 .55rem">What the colours mean</p>
         ${colorKey()}
-        <p class="small subtle" style="margin:.7rem 0 0">Empty is not logged. White outline is the week I have open.</p>
+        <p class="small subtle" style="margin:.7rem 0 0">${year ? "S1–S4 are each shifting’s long exam. C is the year compre." : "Empty is not logged. L is the long exam. White outline is the week I have open."}</p>
       </div>
     `, true);
   }
@@ -880,7 +947,7 @@
     const {shifting} = cur();
     const sh = shiftingStats(shifting);
     const means = Array.from({length:WEEKS},(_,i) => weekStats(shifting, i+1));
-    const compreS = weekStats(shifting, COMPRE);
+    const longS = weekStats(isYear(shifting)?1:shifting, LONG);
     const last = state.attempts.slice(0,8);
     const weekNow = cur().week;
     const weak = state.courses.map(c => {
@@ -894,16 +961,15 @@
       const mean = logged ? cols.reduce((n,x)=>n+(x.logged?x.meanConf:0),0)/logged : 0;
       return { w, cols, mean, logged };
     });
-    const compreAcross = [1,2,3,4].map(s => weekStats(s, COMPRE));
-    const compreLogged = compreAcross.reduce((n,x)=>n+(x.logged?1:0),0);
-    const compreMean = compreLogged ? compreAcross.reduce((n,x)=>n+(x.logged?x.meanConf:0),0)/compreLogged : 0;
+    const longAcross = [1,2,3,4].map(s => weekStats(s, LONG));
+    const longLogged = longAcross.reduce((n,x)=>n+(x.logged?1:0),0);
+    const longMean = longLogged ? longAcross.reduce((n,x)=>n+(x.logged?x.meanConf:0),0)/longLogged : 0;
+    const yearS = weekStats(YEAR, YEAR_WEEK);
     return shell(`
       <p class="eyebrow">Progress</p>
       <h1 class="hero">How this year sits.</h1>
-      <p class="lead">How sure I am, week by week — then whether I am ready for compre.</p>
-      <div class="row shiftbar" style="margin-top:1rem">
-        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
-      </div>
+      <p class="lead">How sure I am, week by week — long exam after each shifting, then compre after all four.</p>
+      ${shiftBar()}
       <p class="section">What the colours mean</p>
       <div class="card">${colorKey()}
         <p class="small subtle" style="margin:.7rem 0 0">Same scale as the map. 1 lost through 5 exam-ready.</p>
@@ -913,12 +979,17 @@
         <div class="stat"><p class="k">Reading</p><p class="v">${Math.round(sh.read)}%</p></div>
         <div class="stat"><p class="k">Exams sat</p><p class="v">${state.attempts.filter(a=>a.shifting===shifting).length}</p></div>
       </div>
-      <p class="section">This shifting</p>
-      <div style="margin:.2rem 0 .8rem">${readCard(sh.meanConf, sh.logged, state.courses.length*WEEKS)}</div>
-      <p class="section">Comprehensive after shifting ${shifting}</p>
-      <div style="margin:.2rem 0 .8rem">${readCard(compreS.meanConf, compreS.logged, state.courses.length)}</div>
+      <p class="section">${isYear(shifting)?"Year compre":"This shifting"}</p>
+      <div style="margin:.2rem 0 .8rem">${readCard(sh.meanConf, sh.logged, state.courses.length*(isYear(shifting)?1:WEEKS))}</div>
+      ${isYear(shifting)?"":`<p class="section">Long exam after shifting ${shifting}</p>
+      <div style="margin:.2rem 0 .8rem">${readCard(longS.meanConf, longS.logged, state.courses.length)}</div>
       <div class="row" style="margin-bottom:1rem">
-        <button class="btn" type="button" data-act="open-compre">Open this comprehensive</button>
+        <button class="btn" type="button" data-act="open-long">Open this long exam</button>
+      </div>`}
+      <p class="section">Year compre — all four shiftings</p>
+      <div style="margin:.2rem 0 .8rem">${readCard(yearS.meanConf, yearS.logged, state.courses.length)}</div>
+      <div class="row" style="margin-bottom:1rem">
+        <button class="btn" type="button" data-act="open-year">Open year compre</button>
       </div>
       <p class="section">Each week, across all four shiftings</p>
       <div class="card" style="overflow:auto">
@@ -931,9 +1002,9 @@
               <td>${esc(interpretMean(row.mean, row.logged, 4).title)}</td>
             </tr>`).join("")}
             <tr>
-              <td>Compre</td>
-              ${compreAcross.map(x => `<td class="mono">${x.logged?x.meanConf.toFixed(1):"—"}</td>`).join("")}
-              <td>${esc(interpretMean(compreMean, compreLogged, 4).title)}</td>
+              <td>Long exam</td>
+              ${longAcross.map(x => `<td class="mono">${x.logged?x.meanConf.toFixed(1):"—"}</td>`).join("")}
+              <td>${esc(interpretMean(longMean, longLogged, 4).title)}</td>
             </tr>
           </tbody>
         </table>
@@ -1141,15 +1212,24 @@
       state.named = true; save(); toast("Saved."); go("#/"); return;
     }
     if (act==="set-shift"){
-      state.cursor.shifting = Number(t.dataset.s); save(); render(); return;
+      const s = Number(t.dataset.s);
+      state.cursor.shifting = s;
+      if (s===YEAR) state.cursor.week = YEAR_WEEK;
+      save(); render(); return;
     }
     if (act==="set-week"){
+      if (isYear()) return;
       state.cursor.week = Number(t.dataset.w); save(); render(); return;
     }
-    if (act==="open-compre"){
-      state.cursor.week = COMPRE; save(); go("#/"); return;
+    if (act==="open-long"){
+      if (isYear()) state.cursor.shifting = 1;
+      state.cursor.week = LONG; save(); go("#/"); return;
+    }
+    if (act==="open-year"){
+      state.cursor.shifting = YEAR; state.cursor.week = YEAR_WEEK; save(); go("#/"); return;
     }
     if (act==="open-cell"){
+      if (t.dataset.s) state.cursor.shifting = Number(t.dataset.s);
       state.cursor.week = Number(t.dataset.w); save(); go("#/c/"+t.dataset.id); return;
     }
     if (act==="conf"){
