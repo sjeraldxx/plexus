@@ -379,6 +379,32 @@
     }
     return n || c.name;
   }
+  function codeFromName(name, fallback){
+    const u = String(name||"").toUpperCase();
+    const m = u.match(/^[A-Z]{1,4}\d{2,4}/);
+    if (m) return m[0].slice(0,8);
+    const compact = u.replace(/[^A-Z0-9]/g,"");
+    return compact.slice(0,6) || fallback || "NEW";
+  }
+  function harvestSetupFields(){
+    if (document.getElementById("pf-nick")) {
+      state.profile = Object.assign(defaultProfile(), state.profile, readProfileFromDom());
+    }
+    document.querySelectorAll("[data-course]").forEach(inp => {
+      const c = state.courses.find(x => x.id===inp.getAttribute("data-course"));
+      if (!c) return;
+      const name = (inp.value||"").trim();
+      if (name){ c.name = name; c.code = codeFromName(name, c.code); }
+    });
+  }
+  function removeCourse(id, dropData){
+    state.courses = state.courses.filter(c => c.id!==id);
+    if (!dropData) return;
+    Object.keys(state.cells).forEach(k => { if (k.endsWith("-"+id)) delete state.cells[k]; });
+    state.exams = state.exams.filter(e => e.courseId!==id);
+    state.attempts = state.attempts.filter(a => a.courseId!==id);
+    if (state.session && state.session.courseId===id) state.session = null;
+  }
   function whoLine(){
     const p = state.profile || defaultProfile();
     return [p.nickname, YEAR_LEVELS[p.yearLevel] || p.yearLevel, p.program].filter(Boolean).join(" · ");
@@ -412,17 +438,23 @@
     return shell(`
       <p class="eyebrow">First sitting</p>
       <h1 class="hero">This log is yours.</h1>
-      <p class="lead">Nickname, course, and year level — then the seven subjects for this year.</p>
+      <p class="lead">Nickname, course, and year level — then the subjects for this year.</p>
       <form class="stack" style="margin-top:1.2rem" data-act="save-courses">
         <label class="field">Nickname<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="What I call myself here" autocomplete="nickname" /></label>
         <label class="field">Course<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
         <label class="field">Year level${yearSelect("pf-year", p.yearLevel)}</label>
-        <p class="section">Seven subjects</p>
-        ${state.courses.map((c,i) => `<label class="field">Subject ${i+1}
-          <input type="text" data-course="${c.id}" value="${esc(/^Course \d+$/.test(c.name)?"":c.name)}" placeholder="e.g. MD201 Pathology" />
-        </label>`).join("")}
-        <div class="row"><button class="btn" type="submit">Save and start</button>
-        <button class="btn ghost" type="button" data-act="skip-setup">Skip for now</button></div>
+        <p class="section">Subjects this year</p>
+        ${state.courses.map((c,i) => `<div class="row" style="align-items:flex-end">
+          <label class="field" style="flex:1">Subject ${i+1}
+            <input type="text" data-course="${c.id}" value="${esc(/^Course \d+$/.test(c.name)?"":c.name)}" placeholder="e.g. MD201 Pathology" />
+          </label>
+          <button class="btn ghost sm" type="button" data-act="setup-remove" data-id="${c.id}">Remove</button>
+        </div>`).join("")}
+        <div class="row">
+          <button class="btn" type="submit">Save and start</button>
+          <button class="btn sec" type="button" data-act="setup-add">Add a subject</button>
+          <button class="btn ghost" type="button" data-act="skip-setup">Skip for now</button>
+        </div>
       </form>
     `);
   }
@@ -434,7 +466,7 @@
     return shell(`
       <p class="who">${whoLine() || "Reading log"}</p>
       <h1 class="hero">Shifting ${shifting}, week ${week}.</h1>
-      <p class="lead">${state.profile.nickname ? "My week of coverage, reading, confidence, notes, and any exam I wrote." : "Seven courses. Log coverage, reading, confidence, notes, then a short exam if I wrote one."}</p>
+      <p class="lead">${state.profile.nickname ? "My week of coverage, reading, confidence, notes, and any exam I wrote." : "Log coverage, reading, confidence, notes, then a short exam if I wrote one."}</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
@@ -447,7 +479,8 @@
         <div class="stat"><p class="k">Reading</p><p class="v">${Math.round(ws.read)}%</p><p class="small subtle" style="margin:.15rem 0 0">average across courses</p></div>
         <div class="stat"><p class="k">This week</p><p class="v">${ws.notes} notes</p><p class="small subtle" style="margin:.15rem 0 0">${ws.exams} practice exam${ws.exams===1?"":"s"}</p></div>
       </div>
-      <p class="section">Courses</p>
+      <p class="section">${state.courses.length} course${state.courses.length===1?"":"s"}</p>
+      ${state.courses.length===0?`<div class="card"><p class="small muted" style="margin:0">No courses yet.</p></div>`:""}
       <div class="grid-7">
         ${state.courses.map(c => {
           const cell = getCell(shifting, week, c.id);
@@ -468,6 +501,9 @@
           </a>`;
         }).join("")}
       </div>
+      <div class="row" style="margin-top:.75rem">
+        <button class="btn" type="button" data-act="add-course">Add a course</button>
+      </div>
       <p class="small subtle" style="margin-top:1.4rem">Progress keeps the 8-week map for this shifting. Everything stays in this browser.</p>
     `, true);
   }
@@ -486,7 +522,10 @@
           <h1 class="hero">${esc(displayName(c))}</h1>
           <p class="lead">Week ${week} of shifting ${shifting}.</p>
         </div>
-        <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Rename</button>
+        <div class="row">
+          <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Edit title</button>
+          <button class="btn warn sm" type="button" data-act="ask-remove-course" data-id="${c.id}">Remove</button>
+        </div>
       </div>
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
@@ -804,7 +843,7 @@
     const app = document.getElementById("app");
     app.onclick = (e) => {
       const t = e.target.closest("[data-act]");
-      if (t) handleAct(t, e);
+      if (t){ e.preventDefault(); e.stopPropagation(); handleAct(t, e); }
     };
     app.onsubmit = (e) => {
       const form = e.target.closest("form");
@@ -816,7 +855,7 @@
         inputs.forEach((inp,i) => {
           const name = (inp.value||"").trim() || ("Course "+(i+1));
           const c = state.courses.find(x => x.id===inp.getAttribute("data-course"));
-          if (c){ c.name = name; c.code = name.slice(0,6).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5) || c.code; }
+          if (c){ c.name = name; c.code = codeFromName(name, c.code); }
         });
         state.named = true; save(); toast("Saved."); go("#/");
       }
@@ -899,12 +938,12 @@
     }
     if (act==="rename-course"){
       const c = course(t.dataset.id);
-      openModal(`<p class="eyebrow">Rename</p>
-        <h3 style="margin:.3rem 0 1rem">${esc(c.name)}</h3>
-        <label class="field">Name<input id="rn-name" type="text" value="${esc(c.name)}" /></label>
+      openModal(`<p class="eyebrow">Edit course</p>
+        <h3 style="margin:.3rem 0 1rem">${esc(displayName(c))}</h3>
+        <label class="field">Title<input id="rn-name" type="text" value="${esc(c.name)}" /></label>
         <label class="field">Code<input id="rn-code" type="text" maxlength="8" value="${esc(c.code)}" /></label>
         <div class="row" style="margin-top:.8rem">
-          <button class="btn" type="button" data-act="do-rename" data-id="${c.id}">Save</button>
+          <button class="btn" type="button" data-act="do-rename" data-id="${c.id}">Save title</button>
           <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
         </div>`);
       return;
@@ -913,8 +952,55 @@
       const c = course(t.dataset.id);
       const name = ((document.getElementById("rn-name")||{}).value||"").trim();
       const code = ((document.getElementById("rn-code")||{}).value||"").trim().toUpperCase();
-      if (!name){ toast("Need a name."); return; }
-      c.name = name; c.code = code || c.code; save(); closeModal(); toast("Renamed."); render(); return;
+      if (!name){ toast("Need a title."); return; }
+      c.name = name; c.code = code || codeFromName(name, c.code); save(); closeModal(); toast("Title saved."); render(); return;
+    }
+    if (act==="add-course"){
+      openModal(`<p class="eyebrow">New course</p>
+        <h3 style="margin:.3rem 0 1rem">Add to this year</h3>
+        <label class="field">Title<input id="nc-name" type="text" placeholder="e.g. MD208 Surgery" /></label>
+        <label class="field">Code<input id="nc-code" type="text" maxlength="8" placeholder="e.g. MD208" /></label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="do-add-course">Add course</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-add-course"){
+      const name = ((document.getElementById("nc-name")||{}).value||"").trim();
+      if (!name){ toast("Need a title."); return; }
+      const code = ((document.getElementById("nc-code")||{}).value||"").trim().toUpperCase() || codeFromName(name, "NEW");
+      const id = uid("c");
+      state.courses.push({ id, name, code });
+      state.named = true;
+      save(); closeModal(); toast("Course added."); go("#/c/"+id); return;
+    }
+    if (act==="setup-add"){
+      harvestSetupFields();
+      state.courses.push({ id: uid("c"), name: "", code: "C"+(state.courses.length+1) });
+      save(); render(); return;
+    }
+    if (act==="setup-remove"){
+      harvestSetupFields();
+      if (state.courses.length<=1){ toast("Keep at least one subject, or skip."); return; }
+      removeCourse(t.dataset.id, false);
+      save(); render(); return;
+    }
+    if (act==="ask-remove-course"){
+      const c = course(t.dataset.id);
+      openModal(`<p class="eyebrow">Remove</p>
+        <h3 style="margin:.3rem 0 .6rem">${esc(displayName(c))}</h3>
+        <p class="small muted">Deletes this course and its notes, coverage, and exams. The others stay.</p>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn warn" type="button" data-act="do-remove-course" data-id="${c.id}">Remove course</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Keep it</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-remove-course"){
+      if (state.courses.length<=1){ toast("Keep at least one course."); closeModal(); return; }
+      removeCourse(t.dataset.id, true);
+      save(); closeModal(); toast("Course removed."); go("#/"); return;
     }
     if (act==="close-modal"){ closeModal(); return; }
     if (act==="new-exam"){
