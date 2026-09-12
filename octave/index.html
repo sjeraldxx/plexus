@@ -284,6 +284,11 @@
     .pdf-overlay img {
       flex: 1; width: 100%; object-fit: contain; background: #0e0f14;
     }
+    .sit-row {
+      display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center;
+      padding: .55rem 0; border-top: 1px solid var(--border);
+    }
+    .sit-row:first-child { border-top: 0; padding-top: 0; }
   </style>
 </head>
 <body>
@@ -365,6 +370,7 @@
     if (parts[0]==="c" && parts[1]) return {name:"course", id:parts[1]};
     if (parts[0]==="exam" && parts[1]) return {name:"exam", id:parts[1]};
     if (parts[0]==="sit" && parts[1]) return {name:"sit", id:parts[1]};
+    if (parts[0]==="practice") return {name:"practice"};
     if (parts[0]==="results") return {name:"results"};
     if (parts[0]==="map") return {name:"map"};
     if (parts[0]==="progress") return {name:"progress"};
@@ -874,6 +880,7 @@
       <a class="brand display" href="#/">${markSvg()}Octave</a>
       <nav class="nav">
         <a href="#/" class="${r.name==="hub"||r.name==="course"?"on":""}">Week</a>
+        <a href="#/practice" class="${r.name==="practice"||r.name==="sit"||r.name==="results"?"on":""}">Practice</a>
         <a href="#/map" class="${r.name==="map"?"on":""}">Map</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
         <a href="#/you" class="${r.name==="you"||r.name==="setup"?"on":""}">You</a>
@@ -1366,29 +1373,79 @@
     `);
   }
 
-  function startSit(exam){
-    const order = exam.questions.map((_,i)=>i);
-    for (let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
-    const questions = order.map(i => exam.questions[i]);
-    state.session = {
-      examId: exam.id, title: exam.title, courseId: exam.courseId,
-      shifting: exam.shifting, week: exam.week,
-      questions, answers: questions.map(()=>null), index: 0, startedAt: Date.now(), finishedAt: null
-    };
-    // sit uses exam.questions in order of session - we'll snapshot onto session
-    exam._sitSnap = questions;
-    save();
+  function shuffleCopy(questions){
+    const qs = (questions||[]).map(q => Object.assign({}, q, { options: (q.options||[]).slice() }));
+    for (let i=qs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=qs[i]; qs[i]=qs[j]; qs[j]=t; }
+    return qs;
   }
-  // Fix sit to use snapshot on session instead of mutating exam
-  function startSit2(exam){
-    const questions = exam.questions.map(q => Object.assign({}, q, { options: q.options.slice() }));
-    for (let i=questions.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [questions[i],questions[j]]=[questions[j],questions[i]]; }
+  function startPool(opts){
+    const questions = shuffleCopy(opts.questions);
+    if (!questions.length) return false;
     state.session = {
-      examId: exam.id, title: exam.title, courseId: exam.courseId,
-      shifting: exam.shifting, week: exam.week,
+      examId: opts.examId, title: opts.title, courseId: opts.courseId,
+      shifting: opts.shifting, week: opts.week,
       questions, answers: questions.map(()=>null), index: 0, startedAt: Date.now(), finishedAt: null
     };
     save();
+    return true;
+  }
+  function slotWeeks(s){
+    return isYear(s) ? [YEAR_WEEK] : [1,2,3,4,5,6,7,8,LONG];
+  }
+  function viewPractice(){
+    const {shifting} = cur();
+    const year = isYear();
+    const weeks = slotWeeks(shifting);
+    const resume = state.session && !state.session.finishedAt && state.session.questions && state.session.questions.length;
+    return shell(`
+      <p class="eyebrow">Practice</p>
+      <h1 class="hero">${year ? "Year compre." : "Shifting "+shifting+"."}</h1>
+      <p class="lead">Pick the shifting, then the course, then the week — sit that set without opening the log.</p>
+      ${shiftBar()}
+      ${resume?`<div class="card row" style="justify-content:space-between;margin-top:1rem">
+        <div>
+          <p class="small muted" style="margin:0">Unfinished</p>
+          <p class="display" style="margin:.15rem 0 0;font-size:1.05rem">${esc(state.session.title)}</p>
+          <p class="small subtle" style="margin:.15rem 0 0">Item ${state.session.index+1} of ${state.session.questions.length}</p>
+        </div>
+        <a class="btn" href="#/sit/${esc(state.session.examId)}">Resume</a>
+      </div>`:""}
+      <div class="stack" style="margin-top:1.1rem">
+        ${state.courses.length===0?`<p class="small muted">Add a course on Week first.</p>`: state.courses.map(c => {
+          const total = state.exams.filter(e => e.courseId===c.id && e.shifting===shifting && (e.questions||[]).length).reduce((n,e)=>n+e.questions.length,0);
+          return `<div class="card">
+            <div class="row" style="justify-content:space-between;align-items:flex-end">
+              <div>
+                <p class="mono eyebrow" style="margin:0">${esc(c.code)}</p>
+                <h2 style="margin:.2rem 0 0;font-size:1.2rem">${esc(displayName(c))}</h2>
+              </div>
+              <p class="small subtle" style="margin:0">${total? total+" item"+(total===1?"":"s"):"No items yet"}</p>
+            </div>
+            <div style="margin-top:.7rem">
+              ${weeks.map(w => {
+                const sets = examsFor(shifting, w, c.id).filter(e => (e.questions||[]).length);
+                const n = sets.reduce((x,e)=>x+e.questions.length,0);
+                const label = weekLabel(w, shifting);
+                return `<div class="sit-row">
+                  <div>
+                    <p style="margin:0;font-weight:600">${esc(label)}</p>
+                    <p class="small muted" style="margin:.1rem 0 0">${n? n+" item"+(n===1?"":"s")+(sets.length>1?" · "+sets.length+" sets":""):"No set imported"}</p>
+                  </div>
+                  <button class="btn sm" type="button" data-act="sit-week" data-id="${c.id}" data-s="${shifting}" data-w="${w}" ${n?"":"disabled"}>Sit</button>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      <p class="small subtle" style="margin-top:1.2rem">Import a CSV on the week if a row says no set. Items shuffle each sitting.</p>
+    `, true);
+  }
+  function startSit2(exam){
+    return startPool({
+      examId: exam.id, title: exam.title, courseId: exam.courseId,
+      shifting: exam.shifting, week: exam.week, questions: exam.questions
+    });
   }
 
   function closeModal(){ document.getElementById("modal").innerHTML = ""; }
@@ -1765,6 +1822,24 @@
       state.exams = state.exams.filter(e => e.id!==t.dataset.id);
       save(); toast("Exam gone."); go("#/c/"+(exam?exam.courseId:"")); return;
     }
+    if (act==="sit-week"){
+      const courseId = t.dataset.id;
+      const s = Number(t.dataset.s);
+      const w = Number(t.dataset.w);
+      const c = course(courseId);
+      const sets = examsFor(s, w, courseId).filter(e => (e.questions||[]).length);
+      const questions = [];
+      sets.forEach(e => e.questions.forEach(q => questions.push(q)));
+      if (!questions.length){ toast("No items for that week."); return; }
+      const examId = sets.length===1 ? sets[0].id : ["pool", courseId, s, w].join("~");
+      state.cursor.shifting = s; state.cursor.week = w;
+      startPool({
+        examId, title: (c?displayName(c):"Course")+" · "+weekLabel(w,s),
+        courseId, shifting: s, week: w, questions
+      });
+      go("#/sit/"+examId);
+      return;
+    }
     if (act==="answer"){
       const ses = state.session; if (!ses || ses.answers[ses.index]!=null) return;
       ses.answers[ses.index] = Number(t.dataset.i); save(); render(); return;
@@ -1842,6 +1917,7 @@
     else if (r.name==="exam") html = viewExam(r.id);
     else if (r.name==="sit") html = viewSit(r.id);
     else if (r.name==="results") html = viewResults();
+    else if (r.name==="practice") html = viewPractice();
     else if (r.name==="map") html = viewMap();
     else if (r.name==="progress") html = viewProgress();
     else if (r.name==="you") html = viewYou();
@@ -1854,9 +1930,19 @@
   const _viewSit = viewSit;
   viewSit = function(id){
     const exam = state.exams.find(e => e.id===id);
-    if (!exam || !exam.questions.length) return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/">Week</a></p>`);
-    if (!state.session || state.session.examId!==id || state.session.finishedAt){
-      startSit2(exam);
+    const live = state.session && !state.session.finishedAt && state.session.examId===id && state.session.questions && state.session.questions.length;
+    if (!live){
+      if (exam && exam.questions.length) startSit2(exam);
+      else if (String(id).indexOf("pool~")===0){
+        const p = String(id).split("~");
+        const courseId = p[1], s = Number(p[2]), w = Number(p[3]);
+        const sets = examsFor(s, w, courseId).filter(e => (e.questions||[]).length);
+        const questions = [];
+        sets.forEach(e => e.questions.forEach(q => questions.push(q)));
+        const c = course(courseId);
+        if (!startPool({ examId:id, title: (c?displayName(c):"Course")+" · "+weekLabel(w,s), courseId, shifting:s, week:w, questions }))
+          return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/practice">Practice</a></p>`);
+      } else return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/practice">Practice</a></p>`);
     }
     const s = state.session;
     const q = s.questions[s.index];
@@ -1865,7 +1951,7 @@
     const isLast = s.index===s.questions.length-1;
     return shell(`
       <p class="eyebrow">${esc(s.title)}</p>
-      <p class="small muted">Item ${s.index+1} of ${s.questions.length} · shuffled</p>
+      <p class="small muted">Item ${s.index+1} of ${s.questions.length} · shuffled · <a href="#/practice" class="small muted">Practice</a></p>
       <h1 class="stem">${esc(q.stem)}</h1>
       <div class="stack" style="margin-top:1rem">
         ${q.options.map((opt,i) => {
@@ -1888,7 +1974,7 @@
   };
   viewResults = function(){
     const ses = state.session;
-    if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/">Week</a></p>`);
+    if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/practice">Practice</a></p>`);
     const total = ses.questions.length;
     let correct=0;
     ses.answers.forEach((a,i) => { if (a===ses.questions[i].correctIndex) correct++; });
@@ -1897,8 +1983,9 @@
       <h1 class="hero">${pct(correct,total)}%</h1>
       <p class="lead">${esc(ses.title)} · ${correct} of ${total}</p>
       <div class="row" style="margin:1rem 0">
-        <a class="btn" href="#/c/${ses.courseId}">Back to the week</a>
+        <a class="btn" href="#/practice">Back to practice</a>
         <a class="btn sec" href="#/sit/${ses.examId}">Sit it again</a>
+        <a class="btn ghost" href="#/c/${ses.courseId}">The week</a>
       </div>
       <div class="card" style="overflow:auto">
         <table>
