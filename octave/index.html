@@ -176,11 +176,12 @@
     }
     .weekbar button.on { background: var(--accent); color: var(--accent-fg); }
     .weekbar button.wide { width: auto; min-width: 6.4rem; padding: 0 .75rem; font-size: .72rem; letter-spacing: .02em; }
-    .shiftbar button {
+    .shiftbar button, .shiftbar a {
       min-height: 2.15rem; padding: 0 .75rem; border-radius: 999px; border: 0; cursor: pointer;
       background: var(--elevated); color: var(--muted); font-size: .8rem; font-weight: 600;
+      display: inline-flex; align-items: center; text-decoration: none;
     }
-    .shiftbar button.on { background: var(--accent); color: var(--accent-fg); }
+    .shiftbar button.on, .shiftbar a.on { background: var(--accent); color: var(--accent-fg); }
     .heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .heat { display: grid; grid-template-columns: 4.6rem repeat(9, minmax(2rem, 1fr)); gap: .28rem; align-items: center; min-width: 32rem; }
     .heat.year { grid-template-columns: 4.6rem repeat(5, minmax(2.4rem, 1fr)); min-width: 22rem; }
@@ -333,6 +334,7 @@
       cells: {},
       exams: [],
       attempts: [],
+      drafts: [],
       session: null
     };
   }
@@ -342,7 +344,7 @@
       if (!raw) return defaultState();
       const d = JSON.parse(raw);
       return Object.assign(defaultState(), d, {
-        cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[],
+        cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[], drafts: d.drafts||[],
         courses: ((d.courses&&d.courses.length)?d.courses:defaultCourses()).map(c => Object.assign({ refs: [] }, c, { refs: Array.isArray(c.refs)?c.refs:[] })),
         profile: Object.assign(defaultProfile(), d.profile||{})
       });
@@ -371,6 +373,7 @@
     if (parts[0]==="exam" && parts[1]) return {name:"exam", id:parts[1]};
     if (parts[0]==="sit" && parts[1]) return {name:"sit", id:parts[1]};
     if (parts[0]==="practice") return {name:"practice", id: parts[1] || ""};
+    if (parts[0]==="unfinished") return {name:"unfinished"};
     if (parts[0]==="results") return {name:"results"};
     if (parts[0]==="map") return {name:"map"};
     if (parts[0]==="progress") return {name:"progress"};
@@ -851,6 +854,7 @@
     state.exams = state.exams.filter(e => e.courseId!==id);
     state.attempts = state.attempts.filter(a => a.courseId!==id);
     if (state.session && state.session.courseId===id) state.session = null;
+    state.drafts = (state.drafts||[]).filter(d => d.courseId!==id);
   }
   function whoLine(){
     const p = state.profile || defaultProfile();
@@ -880,7 +884,7 @@
       <a class="brand display" href="#/">${markSvg()}Octave</a>
       <nav class="nav">
         <a href="#/" class="${r.name==="hub"||r.name==="course"?"on":""}">Week</a>
-        <a href="#/practice" class="${r.name==="practice"||r.name==="sit"||r.name==="results"?"on":""}">Practice</a>
+        <a href="#/practice" class="${r.name==="practice"||r.name==="unfinished"||r.name==="sit"||r.name==="results"?"on":""}">Practice</a>
         <a href="#/map" class="${r.name==="map"?"on":""}">Map</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
         <a href="#/you" class="${r.name==="you"||r.name==="setup"?"on":""}">You</a>
@@ -1378,9 +1382,35 @@
     for (let i=qs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=qs[i]; qs[i]=qs[j]; qs[j]=t; }
     return qs;
   }
+  function parkSession(){
+    const ses = state.session;
+    if (!ses || ses.finishedAt || !ses.questions || !ses.questions.length) return;
+    if (!Array.isArray(state.drafts)) state.drafts = [];
+    state.drafts = state.drafts.filter(d => d.examId !== ses.examId);
+    state.drafts.unshift({
+      examId: ses.examId, title: ses.title, courseId: ses.courseId,
+      shifting: ses.shifting, week: ses.week,
+      questions: ses.questions, answers: ses.answers, index: ses.index,
+      startedAt: ses.startedAt, parkedAt: Date.now()
+    });
+  }
+  function unfinishedList(){
+    const list = ((state.drafts)||[]).slice();
+    const ses = state.session;
+    if (ses && !ses.finishedAt && ses.questions && ses.questions.length && !list.some(d => d.examId===ses.examId)){
+      list.unshift(ses);
+    }
+    return list;
+  }
+  function dropUnfinished(examId){
+    state.drafts = (state.drafts||[]).filter(d => d.examId!==examId);
+    if (state.session && state.session.examId===examId) state.session = null;
+  }
   function startPool(opts){
+    parkSession();
     const questions = shuffleCopy(opts.questions);
     if (!questions.length) return false;
+    dropUnfinished(opts.examId);
     state.session = {
       examId: opts.examId, title: opts.title, courseId: opts.courseId,
       shifting: opts.shifting, week: opts.week,
@@ -1388,6 +1418,29 @@
     };
     save();
     return true;
+  }
+  function resumeDraft(examId){
+    const list = unfinishedList();
+    const d = list.find(x => x.examId===examId);
+    if (!d) return false;
+    if (state.session && state.session.examId!==examId) parkSession();
+    state.drafts = (state.drafts||[]).filter(x => x.examId!==examId);
+    state.session = {
+      examId: d.examId, title: d.title, courseId: d.courseId,
+      shifting: d.shifting, week: d.week,
+      questions: d.questions, answers: d.answers, index: d.index||0,
+      startedAt: d.startedAt, finishedAt: null
+    };
+    save();
+    return true;
+  }
+  function practiceTabs(){
+    const n = unfinishedList().length;
+    const r = route();
+    return `<div class="row shiftbar" style="margin-top:.85rem">
+      <a href="#/practice" class="${r.name==="practice"?"on":""}" style="text-decoration:none">Courses</a>
+      <a href="#/unfinished" class="${r.name==="unfinished"?"on":""}" style="text-decoration:none">Unfinished${n? " · "+n : ""}</a>
+    </div>`;
   }
   function slotWeeks(s){
     return isYear(s) ? [YEAR_WEEK] : [1,2,3,4,5,6,7,8,LONG];
@@ -1398,38 +1451,32 @@
     const weeks = slotWeeks(shifting);
     const r = route();
     const picked = r.id ? course(r.id) : null;
-    const resume = state.session && !state.session.finishedAt && state.session.questions && state.session.questions.length;
-    const resumeCard = resume?`<div class="card row" style="justify-content:space-between;margin-top:1rem">
-        <div>
-          <p class="small muted" style="margin:0">Unfinished</p>
-          <p class="display" style="margin:.15rem 0 0;font-size:1.05rem">${esc(state.session.title)}</p>
-          <p class="small subtle" style="margin:.15rem 0 0">Item ${state.session.index+1} of ${state.session.questions.length}</p>
-        </div>
-        <a class="btn" href="#/sit/${esc(state.session.examId)}">Resume</a>
-      </div>`:"";
     if (picked){
       const total = state.exams.filter(e => e.courseId===picked.id && e.shifting===shifting && (e.questions||[]).length).reduce((n,e)=>n+e.questions.length,0);
+      const open = unfinishedList();
       return shell(`
         <a class="small muted" href="#/practice">← Courses</a>
         <p class="eyebrow" style="margin-top:.7rem">${esc(picked.code)}</p>
         <h1 class="hero">${esc(displayName(picked))}</h1>
         <p class="lead">${year ? "Year compre." : "Shifting "+shifting+". "} ${total? total+" item"+(total===1?"":"s")+" in this block.":"No set imported yet."}</p>
         ${shiftBar()}
-        ${resumeCard}
         <div class="card" style="margin-top:1rem">
           ${weeks.map(w => {
             const sets = examsFor(shifting, w, picked.id).filter(e => (e.questions||[]).length);
             const n = sets.reduce((x,e)=>x+e.questions.length,0);
+            const draft = open.find(d => d.courseId===picked.id && Number(d.shifting)===Number(shifting) && Number(d.week)===Number(w));
             return `<div class="sit-row">
               <div>
                 <p style="margin:0;font-weight:600">${esc(weekLabel(w, shifting))}</p>
-                <p class="small muted" style="margin:.1rem 0 0">${n? n+" item"+(n===1?"":"s")+(sets.length>1?" · "+sets.length+" sets":""):"No set imported"}</p>
+                <p class="small muted" style="margin:.1rem 0 0">${draft? "Unfinished · item "+((draft.index||0)+1)+" of "+draft.questions.length : (n? n+" item"+(n===1?"":"s")+(sets.length>1?" · "+sets.length+" sets":""):"No set imported")}</p>
               </div>
-              <button class="btn sm" type="button" data-act="sit-week" data-id="${picked.id}" data-s="${shifting}" data-w="${w}" ${n?"":"disabled"}>Sit</button>
+              ${draft
+                ? `<button class="btn sm" type="button" data-act="resume-draft" data-id="${esc(draft.examId)}">Resume</button>`
+                : `<button class="btn sm" type="button" data-act="sit-week" data-id="${picked.id}" data-s="${shifting}" data-w="${w}" ${n?"":"disabled"}>Sit</button>`}
             </div>`;
           }).join("")}
         </div>
-        <p class="small subtle" style="margin-top:1.2rem">Import a CSV on the week if a row has no set. Items shuffle each sitting.</p>
+        <p class="small subtle" style="margin-top:1.2rem">Unfinished sittings live under Practice → Unfinished. Import a CSV if a row has no set.</p>
       `, true);
     }
     return shell(`
@@ -1437,7 +1484,7 @@
       <h1 class="hero">${year ? "Year compre." : "Shifting "+shifting+"."}</h1>
       <p class="lead">Pick the course. Weeks open after that.</p>
       ${shiftBar()}
-      ${resumeCard}
+      ${practiceTabs()}
       <p class="section">${state.courses.length} course${state.courses.length===1?"":"s"}</p>
       ${state.courses.length===0?`<p class="small muted">Add a course on Week first.</p>`:""}
       <div class="grid-7">
@@ -1450,6 +1497,32 @@
             <p class="small subtle side">${year?"Compre":"Weeks 1–8, then long exam"}</p>
           </a>`;
         }).join("")}
+      </div>
+    `, true);
+  }
+  function viewUnfinished(){
+    const list = unfinishedList();
+    return shell(`
+      <p class="eyebrow">Practice</p>
+      <h1 class="hero">Unfinished.</h1>
+      <p class="lead">${list.length? list.length+" sitting"+(list.length===1?"":"s")+" left open." : "Nothing left open."}</p>
+      ${practiceTabs()}
+      <div class="stack" style="margin-top:1rem">
+        ${list.length===0?`<div class="card"><p class="small muted" style="margin:0">When I leave a set mid-way, it lands here. Resume from this list.</p></div>`:
+          list.map(d => {
+            const c = course(d.courseId);
+            const done = (d.answers||[]).filter(a => a!=null).length;
+            return `<div class="card row" style="justify-content:space-between;align-items:center">
+              <div>
+                <p class="display" style="margin:0;font-size:1.05rem">${esc(d.title)}</p>
+                <p class="small muted" style="margin:.15rem 0 0">${esc(c?displayName(c):"")} · ${esc(slotLabel(d.shifting, d.week))} · item ${(d.index||0)+1} of ${(d.questions||[]).length} · ${done} answered</p>
+              </div>
+              <div class="row">
+                <button class="btn sm" type="button" data-act="resume-draft" data-id="${esc(d.examId)}">Resume</button>
+                <button class="btn ghost sm" type="button" data-act="drop-draft" data-id="${esc(d.examId)}">Drop</button>
+              </div>
+            </div>`;
+          }).join("")}
       </div>
     `, true);
   }
@@ -1834,6 +1907,13 @@
       state.exams = state.exams.filter(e => e.id!==t.dataset.id);
       save(); toast("Exam gone."); go("#/c/"+(exam?exam.courseId:"")); return;
     }
+    if (act==="resume-draft"){
+      if (!resumeDraft(t.dataset.id)){ toast("That sitting is gone."); return; }
+      go("#/sit/"+t.dataset.id); return;
+    }
+    if (act==="drop-draft"){
+      dropUnfinished(t.dataset.id); save(); toast("Dropped."); render(); return;
+    }
     if (act==="sit-week"){
       const courseId = t.dataset.id;
       const s = Number(t.dataset.s);
@@ -1862,6 +1942,7 @@
       const ses = state.session;
       const exam = { questions: ses.questions };
       ses.finishedAt = Date.now();
+      dropUnfinished(ses.examId);
       let correct=0;
       ses.answers.forEach((a,i) => { if (a===ses.questions[i].correctIndex) correct++; });
       state.attempts.unshift({
@@ -1890,6 +1971,7 @@
       state.exams = [];
       state.attempts = [];
       state.session = null;
+      state.drafts = [];
       state.cursor = { shifting: 1, week: 1 };
       idbClear();
       save(); closeModal(); toast("New year. Desk is empty."); go("#/"); return;
@@ -1930,6 +2012,7 @@
     else if (r.name==="sit") html = viewSit(r.id);
     else if (r.name==="results") html = viewResults();
     else if (r.name==="practice") html = viewPractice();
+    else if (r.name==="unfinished") html = viewUnfinished();
     else if (r.name==="map") html = viewMap();
     else if (r.name==="progress") html = viewProgress();
     else if (r.name==="you") html = viewYou();
@@ -1944,7 +2027,8 @@
     const exam = state.exams.find(e => e.id===id);
     const live = state.session && !state.session.finishedAt && state.session.examId===id && state.session.questions && state.session.questions.length;
     if (!live){
-      if (exam && exam.questions.length) startSit2(exam);
+      if (unfinishedList().some(d => d.examId===id)) resumeDraft(id);
+      else if (exam && exam.questions.length) startSit2(exam);
       else if (String(id).indexOf("pool~")===0){
         const p = String(id).split("~");
         const courseId = p[1], s = Number(p[2]), w = Number(p[3]);
