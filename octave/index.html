@@ -197,6 +197,23 @@
     .cell.c4 { background: color-mix(in srgb, #8faf88 55%, var(--elevated)); }
     .cell.c5 { background: color-mix(in srgb, var(--correct) 70%, var(--elevated)); }
     .cell.on { outline: 2px solid var(--fg); outline-offset: 1px; }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: .55rem 1.05rem; align-items: center;
+    }
+    .legend .sw {
+      display: inline-flex; align-items: center; gap: .45rem;
+      font-size: .82rem; color: var(--muted); line-height: 1.2;
+    }
+    .legend .chip {
+      width: 1.05rem; height: 1.05rem; border-radius: .28rem; flex: none;
+      background: var(--elevated);
+    }
+    .legend .chip.c1 { background: color-mix(in srgb, var(--wrong) 55%, var(--elevated)); }
+    .legend .chip.c2 { background: color-mix(in srgb, #c4a070 55%, var(--elevated)); }
+    .legend .chip.c3 { background: color-mix(in srgb, var(--accent) 45%, var(--elevated)); }
+    .legend .chip.c4 { background: color-mix(in srgb, #8faf88 55%, var(--elevated)); }
+    .legend .chip.c5 { background: color-mix(in srgb, var(--correct) 70%, var(--elevated)); }
+    .legend .n { font-variant-numeric: tabular-nums; color: var(--subtle); font-size: .72rem; }
     .conf { display: flex; flex-wrap: wrap; gap: .35rem; }
     .conf button {
       min-height: 2.35rem; padding: 0 .7rem; border-radius: .55rem; border: 0; cursor: pointer;
@@ -369,6 +386,19 @@
   function readCard(mean, logged, total){
     const r = interpretMean(mean, logged, total);
     return `<div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(r.title)}</p><p>${esc(r.body)}</p></div>`;
+  }
+  function colorKey(){
+    const items = [
+      [0, "", "Not logged"],
+      [1, "1", "Lost"],
+      [2, "2", "Recognize"],
+      [3, "3", "With notes"],
+      [4, "4", "Cold"],
+      [5, "5", "Exam-ready"]
+    ];
+    return `<div class="legend">${items.map(([n,num,lab]) =>
+      `<span class="sw"><i class="chip c${n}"></i>${num?`<span class="n">${num}</span>`:""}${esc(lab)}</span>`
+    ).join("")}</div>`;
   }
 
   function weekStats(s,w){
@@ -789,7 +819,9 @@
             return `<button class="cell c${cell.confidence||0} ${on?"on":""}" data-act="open-cell" data-id="${c.id}" data-w="${w}" title="${esc(c.name)} ${lab}: ${CONF[cell.confidence]}"></button>`;
           }).join("")}
         </div>`).join("")}
-        <p class="small subtle" style="margin:.8rem 0 0">Lost · Recognize · With notes · Cold · Exam-ready</p>
+        <p class="section" style="margin:1rem 0 .55rem">What the colours mean</p>
+        ${colorKey()}
+        <p class="small subtle" style="margin:.7rem 0 0">Empty is not logged. White outline is the week I have open.</p>
       </div>
     `, true);
   }
@@ -821,6 +853,10 @@
       <p class="lead">Self-reported confidence, then a read on preparedness — each week across the four shiftings, and each comprehensive after week 8.</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
+      </div>
+      <p class="section">What the colours mean</p>
+      <div class="card">${colorKey()}
+        <p class="small subtle" style="margin:.7rem 0 0">Same scale as the map. 1 lost through 5 exam-ready.</p>
       </div>
       <div class="grid-3" style="margin-top:1rem">
         <div class="stat"><p class="k">Mean confidence</p><p class="v">${sh.logged? sh.meanConf.toFixed(1):"—"}</p></div>
