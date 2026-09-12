@@ -1030,13 +1030,13 @@
     overlay.querySelector(".modal").addEventListener("click", (e) => {
       e.stopPropagation();
       const t = e.target.closest("[data-act]");
-      if (t) handleAct(t, e);
+      if (t && t.tagName !== "FORM") handleAct(t, e);
     });
     const form = overlay.querySelector("form");
     if (form) {
       form.addEventListener("submit", (e) => {
         e.preventDefault();
-        const btn = form.querySelector("[data-act='create-course'], [data-act='save-q']");
+        const btn = form.querySelector("[data-act='create-course'], [data-act='save-q'], [data-act='do-rename']");
         if (btn) handleAct(btn, e);
       });
     }
@@ -1295,7 +1295,7 @@
 
   function onClick(e){
     const t = e.target.closest("[data-act]");
-    if (!t) return;
+    if (!t || t.tagName === "FORM") return;
     handleAct(t, e);
   }
 
@@ -1363,7 +1363,7 @@
       if (!c) return;
       openModal(`<p class="eyebrow" style="margin:0">Edit course</p>
         <h3 style="margin:.3rem 0 1rem">${esc(c.name)}</h3>
-        <form data-act="do-rename" data-id="${c.id}" class="stack">
+        <form class="stack">
           <label class="field">Title<input id="rn-name" type="text" value="${esc(c.name)}" autocomplete="off" /></label>
           <label class="field">Code<input id="rn-code" type="text" maxlength="8" value="${esc(c.code)}" autocomplete="off" /></label>
           <label class="field">Blurb<textarea id="rn-blurb">${esc(c.blurb||"")}</textarea></label>
