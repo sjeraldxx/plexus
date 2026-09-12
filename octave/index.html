@@ -79,6 +79,7 @@
     }
     main.narrow { max-width: 44rem; }
     .eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0; }
+    .who { font-size: .82rem; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--accent); margin: 0; }
     .hero { font-size: clamp(1.4rem, 2.6vw, 1.85rem); line-height: 1.2; margin: .35rem 0 0; }
     .lead { max-width: 38rem; color: var(--muted); font-size: .95rem; margin: .4rem 0 0; }
     .section { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--subtle); margin: 1.35rem 0 .55rem; }
@@ -268,11 +269,14 @@
       id: "c"+(i+1), name: "Course "+(i+1), code: "C"+(i+1)
     }));
   }
+  const YEAR_LEVELS = { YL1: "Year 1", YL2: "Year 2", YL3: "Year 3" };
+  function defaultProfile(){ return { nickname: "", program: "", yearLevel: "YL2" }; }
   function defaultState(){
     return {
       theme: "dark",
       named: false,
       cursor: { shifting: 1, week: 1 },
+      profile: defaultProfile(),
       courses: defaultCourses(),
       cells: {},
       exams: [],
@@ -285,7 +289,11 @@
       const raw = localStorage.getItem(STORE);
       if (!raw) return defaultState();
       const d = JSON.parse(raw);
-      return Object.assign(defaultState(), d, { cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[], courses: (d.courses&&d.courses.length)?d.courses:defaultCourses() });
+      return Object.assign(defaultState(), d, {
+        cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[],
+        courses: (d.courses&&d.courses.length)?d.courses:defaultCourses(),
+        profile: Object.assign(defaultProfile(), d.profile||{})
+      });
     } catch(e){ return defaultState(); }
   }
   function save(){
@@ -313,6 +321,7 @@
     if (parts[0]==="results") return {name:"results"};
     if (parts[0]==="map") return {name:"map"};
     if (parts[0]==="progress") return {name:"progress"};
+    if (parts[0]==="you") return {name:"you"};
     return {name:"hub"};
   }
   function go(hash){ location.hash = hash; }
@@ -370,6 +379,19 @@
     }
     return n || c.name;
   }
+  function whoLine(){
+    const p = state.profile || defaultProfile();
+    return [p.nickname, YEAR_LEVELS[p.yearLevel] || p.yearLevel, p.program].filter(Boolean).join(" · ");
+  }
+  function yearSelect(id, val){
+    return `<select id="${id}">${Object.keys(YEAR_LEVELS).map(k => `<option value="${k}" ${val===k?"selected":""}>${YEAR_LEVELS[k]}</option>`).join("")}</select>`;
+  }
+  function readProfileFromDom(){
+    const nick = ((document.getElementById("pf-nick")||{}).value||"").trim();
+    const program = ((document.getElementById("pf-program")||{}).value||"").trim();
+    const yearLevel = ((document.getElementById("pf-year")||{}).value||"YL2");
+    return { nickname: nick, program, yearLevel };
+  }
   function shell(inner, wide){
     const r = route();
     return `<header class="app"><div class="bar">
@@ -378,6 +400,7 @@
         <a href="#/" class="${r.name==="hub"||r.name==="course"?"on":""}">Week</a>
         <a href="#/map" class="${r.name==="map"?"on":""}">Map</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
+        <a href="#/you" class="${r.name==="you"||r.name==="setup"?"on":""}">You</a>
         <button class="icon-btn" data-act="theme">${state.theme==="light"?"Dark":"Light"}</button>
       </nav>
     </div></header>
@@ -385,16 +408,21 @@
   }
 
   function viewSetup(){
+    const p = state.profile || defaultProfile();
     return shell(`
       <p class="eyebrow">First sitting</p>
-      <h1 class="hero">Name the seven courses.</h1>
-      <p class="lead">Four shiftings, eight weeks each. These names can be changed later.</p>
+      <h1 class="hero">This log is yours.</h1>
+      <p class="lead">Nickname, course, and year level — then the seven subjects for this year.</p>
       <form class="stack" style="margin-top:1.2rem" data-act="save-courses">
-        ${state.courses.map((c,i) => `<label class="field">Course ${i+1}
-          <input type="text" data-course="${c.id}" value="${esc(c.name==="Course "+(i+1)?"":c.name)}" placeholder="e.g. Pathology" />
+        <label class="field">Nickname<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="What I call myself here" autocomplete="nickname" /></label>
+        <label class="field">Course<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
+        <label class="field">Year level${yearSelect("pf-year", p.yearLevel)}</label>
+        <p class="section">Seven subjects</p>
+        ${state.courses.map((c,i) => `<label class="field">Subject ${i+1}
+          <input type="text" data-course="${c.id}" value="${esc(/^Course \d+$/.test(c.name)?"":c.name)}" placeholder="e.g. MD201 Pathology" />
         </label>`).join("")}
-        <div class="row"><button class="btn" type="submit">Save names</button>
-        <button class="btn ghost" type="button" data-act="skip-setup">Use Course 1–7 for now</button></div>
+        <div class="row"><button class="btn" type="submit">Save and start</button>
+        <button class="btn ghost" type="button" data-act="skip-setup">Skip for now</button></div>
       </form>
     `);
   }
@@ -404,9 +432,9 @@
     const {shifting, week} = cur();
     const ws = weekStats(shifting, week);
     return shell(`
-      <p class="eyebrow">Reading log</p>
+      <p class="who">${whoLine() || "Reading log"}</p>
       <h1 class="hero">Shifting ${shifting}, week ${week}.</h1>
-      <p class="lead">Seven courses. Log coverage, how far the reading got, a confidence score, notes, then a short exam if I wrote one.</p>
+      <p class="lead">${state.profile.nickname ? "My week of coverage, reading, confidence, notes, and any exam I wrote." : "Seven courses. Log coverage, reading, confidence, notes, then a short exam if I wrote one."}</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
@@ -686,16 +714,50 @@
           <td class="mono">${a.correct}/${a.total} · ${pct(a.correct,a.total)}%</td>
         </tr>`).join("")}</tbody>
       </table></div>`}
+      <p class="section">You</p>
+      <div class="card">
+        <p class="display" style="margin:0;font-size:1.15rem">${esc(state.profile.nickname || "No nickname yet")}</p>
+        <p class="small muted" style="margin:.25rem 0 0">${esc(whoLine() || "Add a nickname, course, and year level.")}</p>
+        <div class="row" style="margin-top:.7rem">
+          <a class="btn" href="#/you">Edit profile</a>
+          <a class="btn ghost" href="#/setup">Rename subjects</a>
+        </div>
+      </div>
+      <p class="section">New year</p>
+      <div class="card">
+        <p class="small muted" style="margin-top:0">When Year 2 is done: clear every week’s logs, notes, exams, and scores. Keep my nickname and the seven subject names, then set Year 3. The desk starts empty again.</p>
+        <div class="row">
+          <button class="btn" type="button" data-act="ask-new-year">Start a new year</button>
+          <button class="btn warn sm" type="button" data-act="ask-wipe">Wipe this device</button>
+        </div>
+      </div>
       <p class="section">This device</p>
       <div class="card">
         <p class="small muted" style="margin-top:0">Laptop and iPad do not share this log. Save a transfer file, then restore on the other device.</p>
         <div class="row">
           <button class="btn" type="button" data-act="export">Save transfer file</button>
           <label class="btn sec">Restore<input id="restore" type="file" accept="application/json,.json" hidden /></label>
-          <a class="btn ghost" href="#/setup">Rename courses</a>
         </div>
       </div>
     `, true);
+  }
+
+  function viewYou(){
+    const p = state.profile || defaultProfile();
+    return shell(`
+      <p class="eyebrow">You</p>
+      <h1 class="hero">${esc(p.nickname || "Add a name to this desk.")}</h1>
+      <p class="lead">This is only on this device. It heads the week view so the log reads as mine.</p>
+      <form class="stack" style="margin-top:1.2rem" data-act="save-profile">
+        <label class="field">Nickname<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="What I call myself here" autocomplete="nickname" /></label>
+        <label class="field">Course<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
+        <label class="field">Year level${yearSelect("pf-year", p.yearLevel)}</label>
+        <div class="row">
+          <button class="btn" type="submit">Save profile</button>
+          <a class="btn ghost" href="#/">Back to the week</a>
+        </div>
+      </form>
+    `);
   }
 
   function startSit(exam){
@@ -749,13 +811,18 @@
       if (!form) return;
       e.preventDefault();
       if (form.getAttribute("data-act")==="save-courses"){
+        state.profile = Object.assign(defaultProfile(), state.profile, readProfileFromDom());
         const inputs = [...form.querySelectorAll("[data-course]")];
         inputs.forEach((inp,i) => {
           const name = (inp.value||"").trim() || ("Course "+(i+1));
           const c = state.courses.find(x => x.id===inp.getAttribute("data-course"));
           if (c){ c.name = name; c.code = name.slice(0,6).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5) || c.code; }
         });
-        state.named = true; save(); toast("Courses named."); go("#/");
+        state.named = true; save(); toast("Saved."); go("#/");
+      }
+      if (form.getAttribute("data-act")==="save-profile"){
+        state.profile = Object.assign(defaultProfile(), state.profile, readProfileFromDom());
+        save(); toast("Profile saved."); go("#/");
       }
     };
     ["topics","pages","reading","hours","notes"].forEach(id => {
@@ -914,6 +981,45 @@
       });
       save(); go("#/results"); return;
     }
+    if (act==="ask-new-year"){
+      const p = state.profile || defaultProfile();
+      openModal(`<p class="eyebrow">New year</p>
+        <h3 style="margin:.3rem 0 .6rem">Clear the logs. Keep the desk.</h3>
+        <p class="small muted">Deletes coverage, reading, confidence, notes, exams, and scores. Keeps nickname, course, and the seven subject names. Shifting goes back to 1, week 1.</p>
+        <label class="field" style="margin-top:.8rem">Year level I am moving into${yearSelect("ny-year", p.yearLevel==="YL2"?"YL3":p.yearLevel)}</label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="do-new-year">Start the new year</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Keep this year</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-new-year"){
+      const next = ((document.getElementById("ny-year")||{}).value) || state.profile.yearLevel;
+      state.profile.yearLevel = next;
+      state.cells = {};
+      state.exams = [];
+      state.attempts = [];
+      state.session = null;
+      state.cursor = { shifting: 1, week: 1 };
+      save(); closeModal(); toast("New year. Desk is empty."); go("#/"); return;
+    }
+    if (act==="ask-wipe"){
+      openModal(`<p class="eyebrow">Wipe</p>
+        <h3 style="margin:.3rem 0 .6rem">Everything on this device.</h3>
+        <p class="small muted">Nickname, subjects, notes, exams — gone. Same as a first sitting.</p>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn warn" type="button" data-act="do-wipe">Wipe this device</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-wipe"){
+      const theme = state.theme;
+      state = defaultState();
+      state.theme = theme;
+      document.documentElement.classList.toggle("light", state.theme==="light");
+      save(); closeModal(); toast("Wiped."); go("#/setup"); return;
+    }
     if (act==="export"){
       const stamp = new Date().toISOString().slice(0,10);
       const blob = new Blob([JSON.stringify({kind:"octave-transfer", version:1, exportedAt:Date.now(), ...state})], {type:"application/json"});
@@ -933,6 +1039,7 @@
     else if (r.name==="results") html = viewResults();
     else if (r.name==="map") html = viewMap();
     else if (r.name==="progress") html = viewProgress();
+    else if (r.name==="you") html = viewYou();
     else html = viewHub();
     document.getElementById("app").innerHTML = html;
     bind();
