@@ -442,6 +442,15 @@
     const p = state.profile || defaultProfile();
     return [p.nickname, YEAR_LEVELS[p.yearLevel] || p.yearLevel, p.program].filter(Boolean).join(" · ");
   }
+  function helloName(){
+    const n = ((state.profile||defaultProfile()).nickname||"").trim();
+    return n || "";
+  }
+  function saveProfileFromDom(){
+    state.profile = Object.assign(defaultProfile(), state.profile, readProfileFromDom());
+    state.named = true;
+    save();
+  }
   function yearSelect(id, val){
     return `<select id="${id}">${Object.keys(YEAR_LEVELS).map(k => `<option value="${k}" ${val===k?"selected":""}>${YEAR_LEVELS[k]}</option>`).join("")}</select>`;
   }
@@ -484,7 +493,7 @@
           <button class="btn ghost sm" type="button" data-act="setup-remove" data-id="${c.id}">Remove</button>
         </div>`).join("")}
         <div class="row">
-          <button class="btn" type="submit">Save and start</button>
+          <button class="btn" type="button" data-act="save-courses">Save and start</button>
           <button class="btn sec" type="button" data-act="setup-add">Add a subject</button>
           <button class="btn ghost" type="button" data-act="skip-setup">Skip for now</button>
         </div>
@@ -497,11 +506,11 @@
     const {shifting, week} = cur();
     const ws = weekStats(shifting, week);
     return shell(`
-      <p class="who">${whoLine() || "Reading log"}</p>
-      <h1 class="hero">${slotLabel(shifting, week)}.</h1>
-      <p class="lead">${isCompre(week)
+      <p class="who">${esc(whoLine() || "Reading log")}</p>
+      <h1 class="hero">${helloName() ? "Hello, "+esc(helloName())+"." : "Hello."}</h1>
+      <p class="lead">${slotLabel(shifting, week)}. ${isCompre(week)
         ? "After this shifting. No weekly topics — review progress and confidence per course, then a read on how prepared I am."
-        : (state.profile.nickname ? "My week of coverage, reading, confidence, notes, and any exam I wrote." : "Log coverage, reading, confidence, notes, then a short exam if I wrote one.")}</p>
+        : (helloName() ? "Coverage, reading, confidence, notes, and any exam I wrote." : "Add a name under You so this desk greets me.")}</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
@@ -895,14 +904,14 @@
     const p = state.profile || defaultProfile();
     return shell(`
       <p class="eyebrow">You</p>
-      <h1 class="hero">${esc(p.nickname || "Add a name to this desk.")}</h1>
-      <p class="lead">This is only on this device. It heads the week view so the log reads as mine.</p>
+      <h1 class="hero">${helloName() ? "Hello, "+esc(helloName())+"." : "Add a name to this desk."}</h1>
+      <p class="lead">Saved on this device. The week view will greet me by this name.</p>
       <form class="stack" style="margin-top:1.2rem" data-act="save-profile">
         <label class="field">Nickname<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="What I call myself here" autocomplete="nickname" /></label>
         <label class="field">Course<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
         <label class="field">Year level${yearSelect("pf-year", p.yearLevel)}</label>
         <div class="row">
-          <button class="btn" type="submit">Save profile</button>
+          <button class="btn" type="button" data-act="save-profile">Save profile</button>
           <a class="btn ghost" href="#/">Back to the week</a>
         </div>
       </form>
@@ -953,25 +962,24 @@
     const app = document.getElementById("app");
     app.onclick = (e) => {
       const t = e.target.closest("[data-act]");
-      if (t){ e.preventDefault(); e.stopPropagation(); handleAct(t, e); }
+      if (t && t.tagName !== "FORM"){ e.preventDefault(); e.stopPropagation(); handleAct(t, e); }
     };
     app.onsubmit = (e) => {
       const form = e.target.closest("form");
       if (!form) return;
       e.preventDefault();
       if (form.getAttribute("data-act")==="save-courses"){
-        state.profile = Object.assign(defaultProfile(), state.profile, readProfileFromDom());
+        saveProfileFromDom();
         const inputs = [...form.querySelectorAll("[data-course]")];
         inputs.forEach((inp,i) => {
           const name = (inp.value||"").trim() || ("Course "+(i+1));
           const c = state.courses.find(x => x.id===inp.getAttribute("data-course"));
           if (c){ c.name = name; c.code = codeFromName(name, c.code); }
         });
-        state.named = true; save(); toast("Saved."); go("#/");
+        save(); toast("Saved."); go("#/");
       }
       if (form.getAttribute("data-act")==="save-profile"){
-        state.profile = Object.assign(defaultProfile(), state.profile, readProfileFromDom());
-        save(); toast("Profile saved."); go("#/");
+        saveProfileFromDom(); toast("Profile saved."); go("#/");
       }
     };
     ["topics","pages","reading","hours","notes"].forEach(id => {
@@ -1021,6 +1029,20 @@
       save(); render(); return;
     }
     if (act==="skip-setup"){ state.named = true; save(); go("#/"); return; }
+    if (act==="save-profile"){
+      saveProfileFromDom(); toast("Profile saved."); go("#/"); return;
+    }
+    if (act==="save-courses"){
+      saveProfileFromDom();
+      harvestSetupFields();
+      document.querySelectorAll("[data-course]").forEach((inp,i) => {
+        const c = state.courses.find(x => x.id===inp.getAttribute("data-course"));
+        if (!c) return;
+        const name = (inp.value||"").trim() || ("Course "+(i+1));
+        c.name = name; c.code = codeFromName(name, c.code);
+      });
+      state.named = true; save(); toast("Saved."); go("#/"); return;
+    }
     if (act==="set-shift"){
       state.cursor.shifting = Number(t.dataset.s); save(); render(); return;
     }
