@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Octave · reading log</title>
-  <meta name="description" content="Four shiftings, eight weeks, seven courses. Readings, revision notes, practice exams, weekly confidence." />
+  <title>Plexus · log and bank</title>
+  <meta name="description" content="One desk: weekly reading log, comprehensive, and the question bank." />
   <meta name="theme-color" content="#13141a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -218,7 +218,18 @@
     }
     .opt.ok { background: color-mix(in srgb, var(--correct) 16%, var(--elevated)); }
     .opt.bad { background: color-mix(in srgb, var(--wrong) 16%, var(--elevated)); }
+    .opt.pick { outline: 1px solid var(--accent); }
     .opt:disabled { cursor: default; }
+    .progress { height: .35rem; background: var(--elevated); border-radius: 99px; overflow: hidden; }
+    .progress > span { display: block; height: 100%; background: var(--accent); }
+    .timer {
+      width: 3.4rem; height: 3.4rem; border-radius: 50%;
+      display: grid; place-items: center; font-variant-numeric: tabular-nums; font-size: .85rem; font-weight: 600;
+      background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--elevated) 0);
+    }
+    .timer > span { width: 2.55rem; height: 2.55rem; border-radius: 50%; background: var(--bg); display: grid; place-items: center; }
+    .timer.low { color: var(--wrong); background: conic-gradient(var(--wrong) calc(var(--p) * 1%), var(--elevated) 0); }
+    .switch { display:inline-flex; align-items:center; gap:.45rem; font-size:.85rem; color:var(--muted); cursor:pointer; }
     .rationale { background: var(--elevated); border-radius: .85rem; padding: .85rem 1rem; font-size: .92rem; }
     .toast {
       position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem; z-index: 50;
@@ -254,11 +265,13 @@
   <script>
 (function () {
   "use strict";
-  const STORE = "octave-v1";
+  const STORE = "desk-v1";
+  const STORE_OCTAVE = "octave-v1";
+  const STORE_PLEXUS = "plexus-pages-v1";
   const SHIFTINGS = 4;
   const WEEKS = 8;
   const COMPRE = 9;
-  const LETTERS = ["A","B","C","D"];
+  const LETTERS = ["A","B","C","D","E","F"];
   const CONF = ["—", "Lost", "Recognize", "With notes", "Cold", "Exam-ready"];
 
   function uid(p){ return p + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
@@ -286,7 +299,12 @@
       cells: {},
       exams: [],
       attempts: [],
-      session: null
+      session: null,
+      questions: [],
+      itemStats: {},
+      bank: null,
+      bankAttempts: [],
+      migrated: false
     };
   }
   function load(){
@@ -297,7 +315,9 @@
       return Object.assign(defaultState(), d, {
         cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[],
         courses: (d.courses&&d.courses.length)?d.courses:defaultCourses(),
-        profile: Object.assign(defaultProfile(), d.profile||{})
+        profile: Object.assign(defaultProfile(), d.profile||{}),
+        questions: d.questions||[], itemStats: d.itemStats||{},
+        bankAttempts: d.bankAttempts||[], migrated: !!d.migrated
       });
     } catch(e){ return defaultState(); }
   }
@@ -306,7 +326,10 @@
   }
 
   let state = load();
+  migrateIn();
   document.documentElement.classList.toggle("light", state.theme==="light");
+  let timerIv = null;
+  let uiBank = { timerOn: true, shuffle: true };
   let toastT = null;
   function toast(msg){
     const el = document.getElementById("toast");
@@ -327,6 +350,9 @@
     if (parts[0]==="map") return {name:"map"};
     if (parts[0]==="progress") return {name:"progress"};
     if (parts[0]==="you") return {name:"you"};
+    if (parts[0]==="bank") return {name:"bank"};
+    if (parts[0]==="quiz") return {name:"quiz"};
+    if (parts[0]==="bresults") return {name:"bresults"};
     return {name:"hub"};
   }
   function go(hash){ location.hash = hash; }
@@ -437,6 +463,75 @@
     state.exams = state.exams.filter(e => e.courseId!==id);
     state.attempts = state.attempts.filter(a => a.courseId!==id);
     if (state.session && state.session.courseId===id) state.session = null;
+    state.questions = state.questions.filter(q => q.courseId!==id);
+  }
+  function migrateIn(){
+    if (state.migrated) return;
+    try {
+      const oct = JSON.parse(localStorage.getItem(STORE_OCTAVE)||"null");
+      if (oct && oct.courses && !state.named && oct.named){
+        state = Object.assign(defaultState(), oct, {
+          questions: state.questions, itemStats: state.itemStats,
+          bankAttempts: state.bankAttempts
+        });
+      } else if (oct && oct.cells && Object.keys(state.cells).length===0){
+        state.cells = oct.cells||state.cells;
+        state.exams = oct.exams||state.exams;
+        state.attempts = oct.attempts||state.attempts;
+        if (oct.courses && oct.courses.length) state.courses = oct.courses;
+        if (oct.profile) state.profile = Object.assign(defaultProfile(), oct.profile);
+        if (oct.named) state.named = true;
+        if (oct.cursor) state.cursor = oct.cursor;
+      }
+    } catch(e){}
+    try {
+      const plex = JSON.parse(localStorage.getItem(STORE_PLEXUS)||"null");
+      if (plex && plex.questions && plex.questions.length){
+        const byCode = {};
+        state.courses.forEach(c => { byCode[String(c.code||"").toUpperCase()] = c.id; });
+        const idMap = {};
+        (plex.courses||[]).forEach(pc => {
+          const code = String(pc.code||"").toUpperCase();
+          const hit = byCode[code] || (state.courses.find(c => c.name.toLowerCase()===String(pc.name||"").toLowerCase())||{}).id;
+          if (hit) idMap[pc.id] = hit;
+          else {
+            state.courses.push({ id: pc.id, name: pc.name, code: pc.code||codeFromName(pc.name,"NEW") });
+            idMap[pc.id] = pc.id;
+          }
+        });
+        const have = new Set(state.questions.map(q => (q.stem||"").toLowerCase().trim()));
+        (plex.questions||[]).forEach(q => {
+          const k = (q.stem||"").toLowerCase().trim();
+          if (!k || have.has(k)) return;
+          have.add(k);
+          state.questions.push(Object.assign({}, q, {
+            courseId: idMap[q.courseId] || q.courseId,
+            shifting: q.shifting || q.quarter || 1
+          }));
+        });
+        state.itemStats = Object.assign({}, plex.itemStats||{}, state.itemStats);
+        if (plex.attempts && plex.attempts.length && !state.bankAttempts.length){
+          state.bankAttempts = plex.attempts.slice();
+        }
+      }
+    } catch(e){}
+    state.migrated = true;
+    save();
+  }
+  function bankQs(opts){
+    opts = opts||{};
+    return state.questions.filter(q => {
+      if (opts.courseId && q.courseId!==opts.courseId) return false;
+      const sh = q.shifting || q.quarter;
+      if (opts.shifting && sh!==opts.shifting) return false;
+      if (opts.week && q.week!==opts.week) return false;
+      return true;
+    });
+  }
+  function bankStats(){
+    let seen=0, correct=0;
+    Object.values(state.itemStats||{}).forEach(s => { seen+=s.seen||0; correct+=s.correct||0; });
+    return { seen, correct, acc: pct(correct, seen), n: state.questions.length };
   }
   function whoLine(){
     const p = state.profile || defaultProfile();
@@ -454,9 +549,10 @@
   function shell(inner, wide){
     const r = route();
     return `<header class="app"><div class="bar">
-      <a class="brand display" href="#/">${markSvg()}Octave</a>
+      <a class="brand display" href="#/">${markSvg()}Plexus</a>
       <nav class="nav">
-        <a href="#/" class="${r.name==="hub"||r.name==="course"?"on":""}">Week</a>
+        <a href="#/" class="${r.name==="hub"||r.name==="course"?"on":""}">Log</a>
+        <a href="#/bank" class="${r.name==="bank"||r.name==="quiz"||r.name==="bresults"?"on":""}">Bank</a>
         <a href="#/map" class="${r.name==="map"?"on":""}">Map</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
         <a href="#/you" class="${r.name==="you"||r.name==="setup"?"on":""}">You</a>
@@ -604,7 +700,14 @@
             <a class="btn sm" href="#/exam/${e.id}">Edit</a>
             <a class="btn sm sec" href="#/sit/${e.id}">Sit</a>
           </div>
-        </div>`).join("")}`;
+        </div>`).join("")}
+      <p class="section">Bank</p>
+      <p class="small muted">CSV items for this course, this shifting, this week. 60-second timer. Same desk as the log.</p>
+      <div class="row" style="margin:.5rem 0 .8rem">
+        <button class="btn" type="button" data-act="sit-bank" data-id="${id}" ${bankQs({courseId:id,shifting,week}).length?"":"disabled"}>Sit ${bankQs({courseId:id,shifting,week}).length} items</button>
+        <label class="btn sec">Upload CSV<input id="week-csv" type="file" accept=".csv,text/csv" multiple hidden data-course="${id}" /></label>
+      </div>
+      `;
     const compreBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
@@ -806,10 +909,11 @@
     const compreAcross = [1,2,3,4].map(s => weekStats(s, COMPRE));
     const compreLogged = compreAcross.reduce((n,x)=>n+(x.logged?1:0),0);
     const compreMean = compreLogged ? compreAcross.reduce((n,x)=>n+(x.logged?x.meanConf:0),0)/compreLogged : 0;
+    const bs = bankStats();
     return shell(`
       <p class="eyebrow">Progress</p>
       <h1 class="hero">How this year sits.</h1>
-      <p class="lead">Self-reported confidence, then a read on preparedness — each week across the four shiftings, and each comprehensive after week 8.</p>
+      <p class="lead">Self-reported confidence, then a read on preparedness — each week across the four shiftings, and each comprehensive after week 8. The bank keeps its own accuracy.</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
@@ -817,6 +921,7 @@
         <div class="stat"><p class="k">Mean confidence</p><p class="v">${sh.logged? sh.meanConf.toFixed(1):"—"}</p></div>
         <div class="stat"><p class="k">Reading</p><p class="v">${Math.round(sh.read)}%</p></div>
         <div class="stat"><p class="k">Exams sat</p><p class="v">${state.attempts.filter(a=>a.shifting===shifting).length}</p></div>
+        <div class="stat"><p class="k">Bank</p><p class="v">${bs.seen?bs.acc+"%":"—"}</p><p class="small subtle" style="margin:.15rem 0 0">${bs.n} items</p></div>
       </div>
       <p class="section">This shifting</p>
       <div style="margin:.2rem 0 .8rem">${readCard(sh.meanConf, sh.logged, state.courses.length*WEEKS)}</div>
@@ -889,6 +994,268 @@
         </div>
       </div>
     `, true);
+  }
+
+  function viewBank(){
+    const {shifting, week} = cur();
+    const bs = bankStats();
+    const compre = isCompre(week);
+    return shell(`
+      <p class="who">${whoLine() || "Question bank"}</p>
+      <h1 class="hero">Bank.</h1>
+      <p class="lead">Items live on a course, a shifting, and a week — the same spine as the log. CSV in, 60 seconds each, shuffled.</p>
+      <div class="row shiftbar" style="margin-top:1rem">
+        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
+      </div>
+      <div class="weekbar" style="margin-top:.7rem">
+        ${Array.from({length:WEEKS},(_,i)=>i+1).map(w => `<button type="button" class="${week===w?"on":""}" data-act="set-week" data-w="${w}">${w}</button>`).join("")}
+        <button type="button" class="wide ${week===COMPRE?"on":""}" data-act="set-week" data-w="${COMPRE}">Compre</button>
+      </div>
+      <div class="grid-3" style="margin-top:1rem">
+        <div class="stat"><p class="k">Items</p><p class="v">${bs.n}</p></div>
+        <div class="stat"><p class="k">Accuracy</p><p class="v">${bs.seen?bs.acc+"%":"—"}</p></div>
+        <div class="stat"><p class="k">This ${compre?"compre":"week"}</p><p class="v">${bankQs({shifting, week}).length}</p></div>
+      </div>
+      <p class="section">Courses</p>
+      <div class="stack">
+        ${state.courses.map(c => {
+          const n = bankQs({courseId:c.id, shifting, week}).length;
+          const all = bankQs({courseId:c.id}).length;
+          return `<div class="card row" style="justify-content:space-between">
+            <div>
+              <p class="mono eyebrow" style="margin:0">${esc(c.code)}</p>
+              <p class="display" style="margin:.2rem 0 0;font-size:1.08rem">${esc(displayName(c))}</p>
+              <p class="small muted" style="margin:.2rem 0 0">${n} this ${compre?"compre":"week"} · ${all} in the bank</p>
+            </div>
+            <div class="row">
+              <button class="btn sm" type="button" data-act="sit-bank" data-id="${c.id}" ${n?"":"disabled"}>Sit</button>
+              <label class="btn sm sec">CSV<input class="week-csv" type="file" accept=".csv,text/csv" multiple hidden data-course="${c.id}" /></label>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      <p class="small subtle" style="margin-top:1rem">Columns: question, option A–D, correct, rationale. Duplicates keep one copy. Shifting ${shifting} · ${weekLabel(week)}.</p>
+    `, true);
+  }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function startBank(courseId){
+    const {shifting, week} = cur();
+    const c = course(courseId);
+    let pool = bankQs({courseId, shifting, week}).map(q => Object.assign({}, q, { options: (q.options||[]).slice() }));
+    if (!pool.length){ toast("No items for this week."); return false; }
+    if (uiBank.shuffle) shuffle(pool);
+    const answers={}, remainingMs={};
+    pool.forEach(q => { answers[q.id]=null; remainingMs[q.id]= uiBank.timerOn?60000:0; });
+    state.bank = {
+      courseId, shifting, week, title: (c?c.code+" · ":"")+weekLabel(week),
+      items: pool, answers, remainingMs, timedOut:[], index:0,
+      timerOn: uiBank.timerOn, startedAt: Date.now(), finishedAt: null
+    };
+    save(); return true;
+  }
+  function scoreBank(ses){
+    let correct=0, wrong=0, timedOut=0, unanswered=0;
+    ses.items.forEach(q => {
+      const ans = ses.answers[q.id];
+      if (ses.timedOut.includes(q.id) && (ans==null)) timedOut++;
+      else if (ans==null) unanswered++;
+      else if (ans===q.correctIndex) correct++;
+      else wrong++;
+    });
+    return { total: ses.items.length, correct, wrong, timedOut, unanswered };
+  }
+  function finishBank(){
+    const ses = state.bank; if (!ses || ses.finishedAt) return;
+    ses.finishedAt = Date.now();
+    const s = scoreBank(ses);
+    state.bankAttempts.unshift({
+      at: ses.finishedAt, title: ses.title, courseId: ses.courseId,
+      shifting: ses.shifting, week: ses.week,
+      correct: s.correct, total: s.total, timedOut: s.timedOut
+    });
+    ses.items.forEach(q => {
+      const cur = state.itemStats[q.id] || {seen:0,correct:0,wrong:0,timedOut:0};
+      const ans = ses.answers[q.id];
+      const timed = ses.timedOut.includes(q.id);
+      const copy = Object.assign({}, cur, { seen: cur.seen+1 });
+      if (timed && ans==null) copy.timedOut++;
+      else if (ans===q.correctIndex) copy.correct++;
+      else copy.wrong++;
+      state.itemStats[q.id] = copy;
+    });
+    save();
+  }
+  function tickBank(){
+    const ses = state.bank;
+    if (!ses || ses.finishedAt || !ses.timerOn) return;
+    const q = ses.items[ses.index];
+    if (!q) return;
+    if (ses.answers[q.id]!=null || ses.timedOut.includes(q.id)) return;
+    const left = ses.remainingMs[q.id]||0;
+    if (left<=0){
+      if (!ses.timedOut.includes(q.id)) ses.timedOut.push(q.id);
+      save(); render(); return;
+    }
+    ses.remainingMs[q.id] = left - 250;
+    const ring = document.querySelector(".timer");
+    if (ring){
+      const p = Math.max(0, (ses.remainingMs[q.id]/60000)*100);
+      ring.style.setProperty("--p", p);
+      const span = ring.querySelector("span");
+      if (span) span.textContent = String(Math.max(0, Math.ceil(ses.remainingMs[q.id]/1000)));
+      if (ses.remainingMs[q.id]<=10000) ring.classList.add("low");
+    }
+  }
+  function viewQuiz(){
+    const ses = state.bank;
+    if (!ses || !ses.items.length) return shell(`<p class="muted">No set in progress.</p><p><a class="btn" href="#/bank">Bank</a></p>`);
+    if (ses.finishedAt) { go("#/bresults"); return ""; }
+    const q = ses.items[ses.index];
+    const chosen = ses.answers[q.id];
+    const timedOut = ses.timedOut.includes(q.id);
+    const locked = chosen!=null || timedOut;
+    const left = ses.remainingMs[q.id]||0;
+    const p = ses.timerOn ? Math.max(0, Math.min(100, (left/60000)*100)) : 0;
+    const secs = Math.ceil(left/1000);
+    const isLast = ses.index===ses.items.length-1;
+    return shell(`
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <p class="eyebrow" style="margin:0">${esc(ses.title)}</p>
+          <p class="small muted" style="margin:.2rem 0 0">Shifting ${ses.shifting} · ${esc(weekLabel(ses.week))} · shuffled</p>
+        </div>
+        ${ses.timerOn && !locked ? `<div class="timer ${secs<=10?"low":""}" style="--p:${p}"><span>${secs}</span></div>` : (timedOut?`<span class="badge">Timed out</span>`:"")}
+      </div>
+      <div class="progress" style="margin:1rem 0"><span style="width:${((ses.index+1)/ses.items.length)*100}%"></span></div>
+      <p class="small muted">Item ${ses.index+1} of ${ses.items.length}</p>
+      <h1 class="stem">${esc(q.stem)}</h1>
+      <div class="stack" style="margin-top:1rem">
+        ${q.options.map((opt,i) => {
+          let cls="opt";
+          if (locked && i===q.correctIndex) cls+=" ok";
+          else if (locked && chosen===i && i!==q.correctIndex) cls+=" bad";
+          return `<button class="${cls}" data-act="bank-answer" data-i="${i}" ${locked?"disabled":""}><span class="ltr">${LETTERS[i]}</span><span>${esc(opt)}</span></button>`;
+        }).join("")}
+      </div>
+      ${locked?`<div class="rationale" style="margin-top:1rem">
+        <p class="small" style="margin:0;color:${chosen===q.correctIndex?"var(--correct)":"var(--wrong)"}">${timedOut && chosen==null?"Time ran out.": chosen===q.correctIndex?"That’s it.":"Not this one."} Answer ${LETTERS[q.correctIndex]}.</p>
+        <p class="small" style="margin:.4rem 0 0">${esc(q.rationale||"")}</p>
+      </div>`:""}
+      <div class="row" style="margin-top:1.1rem;justify-content:space-between">
+        <button class="btn sec" type="button" data-act="bank-prev" ${ses.index===0?"disabled":""}>Previous</button>
+        ${isLast?`<button class="btn" type="button" data-act="bank-finish" ${locked?"":"disabled"}>See score</button>`:
+          `<button class="btn" type="button" data-act="bank-next" ${locked?"":"disabled"}>Next</button>`}
+      </div>
+    `);
+  }
+  function viewBResults(){
+    const ses = state.bank;
+    if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/bank">Bank</a></p>`);
+    const s = scoreBank(ses);
+    return shell(`
+      <p class="eyebrow">This set</p>
+      <h1 class="hero">${pct(s.correct,s.total)}%</h1>
+      <p class="lead">${esc(ses.title)} · ${s.correct} of ${s.total}${s.timedOut?` · ${s.timedOut} timed out`:""}</p>
+      <div class="row" style="margin:1rem 0">
+        <a class="btn" href="#/bank">Bank</a>
+        <a class="btn sec" href="#/c/${ses.courseId}">Back to the log</a>
+      </div>
+      <div class="card" style="overflow:auto">
+        <table>
+          <thead><tr><th>#</th><th>Stem</th><th>Yours</th><th>Key</th></tr></thead>
+          <tbody>${ses.items.map((q,i) => {
+            const a = ses.answers[q.id];
+            const timed = ses.timedOut.includes(q.id);
+            const ok = a===q.correctIndex;
+            return `<tr>
+              <td class="mono">${i+1}</td>
+              <td>${esc((q.stem||"").slice(0,90))}</td>
+              <td style="color:${ok?"var(--correct)":"var(--wrong)"}">${timed && a==null?"—":(a==null?"—":LETTERS[a])}</td>
+              <td>${LETTERS[q.correctIndex]}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+    `);
+  }
+  function detectDelim(text){
+    const sample = text.split(/\r?\n/).slice(0,6).join("\n");
+    const c=(sample.match(/,/g)||[]).length, s=(sample.match(/;/g)||[]).length, tab=(sample.match(/\t/g)||[]).length;
+    if (tab>c && tab>s) return "\t"; if (s>c) return ";"; return ",";
+  }
+  function parseCsvText(text){
+    const raw = text.replace(/^\uFEFF/,"");
+    const delim = detectDelim(raw);
+    const rows=[]; let row=[], cell="", inQ=false;
+    for (let i=0;i<raw.length;i++){
+      const ch=raw[i], next=raw[i+1];
+      if (inQ){
+        if (ch==='"'){ if(next==='"'){ cell+='"'; i++; } else inQ=false; }
+        else cell+=ch;
+      } else if (ch==='"') inQ=true;
+      else if (ch===delim){ row.push(cell); cell=""; }
+      else if (ch==="\n"){ row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row); row=[]; cell=""; }
+      else if (ch!=="\r") cell+=ch;
+    }
+    row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row);
+    return rows.map(r => r.map(c => c.trim()));
+  }
+  function nHead(h){ return h.trim().toLowerCase().replace(/[\s-]+/g,"_"); }
+  function lookup(map, keys){ for (const k of keys) if (map[k]) return map[k]; return ""; }
+  function resolveCorrect(correct, options){
+    const raw = String(correct||"").trim(); if (!raw) return -1;
+    const letter = raw.replace(/[^A-Za-z0-9]/g,"");
+    if (/^[A-Fa-f]$/.test(letter)) return letter.toUpperCase().charCodeAt(0)-65;
+    const lower = raw.toLowerCase();
+    let i = options.findIndex(o => o.toLowerCase()===lower);
+    if (i>=0) return i;
+    return options.findIndex(o => o.toLowerCase().includes(lower) || lower.includes(o.toLowerCase()));
+  }
+  function interpretCsv(text){
+    const table = parseCsvText(text);
+    const errors=[];
+    if (!table.length) return {rows:[], errors:[{message:"File is empty."}]};
+    const STEM=["question","stem","q","item"];
+    const RAT=["rationale","explanation","explain"];
+    const COR=["correct","answer","correct_answer","key"];
+    const COLS=[["option_a","a","optiona"],["option_b","b","optionb"],["option_c","c","optionc"],["option_d","d","optiond"],["option_e","e","optione"]];
+    const first = table[0].map(nHead);
+    const hasHeader = first.some(h => STEM.includes(h)||COR.includes(h)||h==="option_a"||h==="a");
+    let headers = first, body = table.slice(1);
+    if (!hasHeader){ headers=["question","option_a","option_b","option_c","option_d","correct","rationale"]; body=table; }
+    const rows=[];
+    body.forEach((cols) => {
+      const map={}; headers.forEach((h,idx)=> map[h]=cols[idx]||"");
+      const stem = lookup(map, STEM);
+      const rationale = lookup(map, RAT);
+      let options = COLS.map(k => lookup(map,k)).filter(Boolean);
+      if (!stem || options.length<2) return;
+      const ci = resolveCorrect(lookup(map,COR), options);
+      if (ci<0) return;
+      rows.push({stem, options, correctIndex:ci, rationale});
+    });
+    return {rows, errors};
+  }
+  function ingestCsv(courseId, texts){
+    const {shifting, week} = cur();
+    const have = new Set(state.questions.filter(q=>q.courseId===courseId).map(q => (q.stem||"").toLowerCase().trim()));
+    let added=0, dupes=0;
+    texts.forEach(text => {
+      const {rows} = interpretCsv(text);
+      rows.forEach(r => {
+        const k = r.stem.toLowerCase().trim();
+        if (have.has(k)){ dupes++; return; }
+        have.add(k);
+        state.questions.push({
+          id: uid("q"), courseId, shifting, week, quarter: shifting,
+          stem: r.stem, options: r.options, correctIndex: r.correctIndex, rationale: r.rationale,
+          createdAt: Date.now()
+        });
+        added++;
+      });
+    });
+    save();
+    return {added, dupes};
   }
 
   function viewYou(){
@@ -1001,13 +1368,29 @@
       if (!f) return;
       f.text().then(text => {
         const dump = JSON.parse(text);
-        if (!dump.courses || !dump.cells) throw new Error("bad");
-        if (!confirm("Replace this log with the transfer file?")) return;
+        if (!dump.courses) throw new Error("bad");
+        if (!confirm("Replace this desk with the transfer file?")) return;
         state = Object.assign(defaultState(), dump);
         document.documentElement.classList.toggle("light", state.theme==="light");
         save(); toast("This device now matches the other one."); go("#/");
-      }).catch(() => toast("That isn’t an Octave transfer file."));
+      }).catch(() => toast("That isn’t a Plexus transfer file."));
     };
+    function onCsvFiles(input){
+      const files = [...(input.files||[])];
+      input.value = "";
+      const courseId = input.getAttribute("data-course");
+      if (!files.length || !courseId) return;
+      Promise.all(files.map(f => f.text())).then(texts => {
+        const r = ingestCsv(courseId, texts);
+        toast((r.added? r.added+" added":"Nothing new")+(r.dupes? " · "+r.dupes+" duplicate"+(r.dupes===1?"":"s")+" skipped":"")+".");
+        render();
+      }).catch(() => toast("Could not read that CSV."));
+    }
+    const weekCsv = document.getElementById("week-csv");
+    if (weekCsv) weekCsv.onchange = () => onCsvFiles(weekCsv);
+    document.querySelectorAll("input.week-csv").forEach(inp => {
+      inp.onchange = () => onCsvFiles(inp);
+    });
     window.onkeydown = (e) => {
       if (e.key==="Escape" && document.querySelector(".overlay")) closeModal();
     };
@@ -1221,9 +1604,28 @@
     }
     if (act==="export"){
       const stamp = new Date().toISOString().slice(0,10);
-      const blob = new Blob([JSON.stringify({kind:"octave-transfer", version:1, exportedAt:Date.now(), ...state})], {type:"application/json"});
-      const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="octave-transfer-"+stamp+".json"; a.click();
+      const blob = new Blob([JSON.stringify({kind:"plexus-desk", version:2, exportedAt:Date.now(), ...state})], {type:"application/json"});
+      const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="plexus-desk-"+stamp+".json"; a.click();
       toast("Transfer file saved."); return;
+    }
+    if (act==="sit-bank"){
+      if (!startBank(t.dataset.id)) return;
+      go("#/quiz"); return;
+    }
+    if (act==="bank-answer"){
+      const ses = state.bank; if (!ses) return;
+      const q = ses.items[ses.index];
+      if (ses.answers[q.id]!=null || ses.timedOut.includes(q.id)) return;
+      ses.answers[q.id] = Number(t.dataset.i); save(); render(); return;
+    }
+    if (act==="bank-next"){
+      const ses=state.bank; if (ses && ses.index<ses.items.length-1){ ses.index++; save(); render(); } return;
+    }
+    if (act==="bank-prev"){
+      const ses=state.bank; if (ses && ses.index>0){ ses.index--; save(); render(); } return;
+    }
+    if (act==="bank-finish"){
+      finishBank(); go("#/bresults"); return;
     }
   }
 
@@ -1239,9 +1641,16 @@
     else if (r.name==="map") html = viewMap();
     else if (r.name==="progress") html = viewProgress();
     else if (r.name==="you") html = viewYou();
+    else if (r.name==="bank") html = viewBank();
+    else if (r.name==="quiz") html = viewQuiz();
+    else if (r.name==="bresults") html = viewBResults();
     else html = viewHub();
     document.getElementById("app").innerHTML = html;
     bind();
+    clearInterval(timerIv); timerIv = null;
+    if (r.name==="quiz" && state.bank && state.bank.timerOn && !state.bank.finishedAt){
+      timerIv = setInterval(tickBank, 250);
+    }
   }
 
   // Use shuffled snapshot on session for sitting
