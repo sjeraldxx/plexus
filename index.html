@@ -71,7 +71,7 @@
       padding: .35rem 1rem;
     }
     .brand { display: flex; align-items: center; gap: .55rem; font-size: 1.05rem; }
-    .nav { display: flex; align-items: center; gap: .15rem; }
+    .nav { display: flex; align-items: center; gap: .15rem; flex-wrap: wrap; justify-content: flex-end; }
     .nav a, .icon-btn {
       display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 .7rem;
       border-radius: .5rem; color: var(--muted); border: 0; background: transparent; cursor: pointer; font-size: .9rem;
@@ -213,6 +213,27 @@
     YL2: "Mechanisms of disease, and the drugs that meet them.",
     YL3: "Clerkship stems. Put the science next to a patient."
   };
+  const PLE = [
+    { id:"physio", short:"Physiology", name:"Physiology", day:1 },
+    { id:"legal", short:"Legal medicine & ethics", name:"Legal Medicine, Medical Jurisprudence and Medical Ethics", day:1 },
+    { id:"path", short:"Pathology", name:"Pathology", day:1 },
+    { id:"biochem", short:"Biochemistry", name:"Biochemistry", day:2 },
+    { id:"anat", short:"Anatomy & histology", name:"Anatomy and Histology", day:2 },
+    { id:"micro", short:"Microbiology & parasitology", name:"Microbiology and Parasitology", day:2 },
+    { id:"obgyn", short:"OB-GYN", name:"Obstetrics and Gynecology", day:3 },
+    { id:"peds", short:"Pediatrics & nutrition", name:"Pediatrics and Nutrition", day:3 },
+    { id:"preven", short:"Preventive medicine", name:"Preventive Medicine and Public Health", day:3 },
+    { id:"pharma", short:"Pharmacology", name:"Pharmacology and Therapeutics", day:4 },
+    { id:"surg", short:"Surgery, Ophtha & ORL", name:"Surgery and Ophthalmology, Otolaryngology and Rhinology", day:4 },
+    { id:"med", short:"Medicine", name:"Medicine", day:4 }
+  ];
+  function pleById(id){ return PLE.find(p => p.id===id); }
+  function matchPle(raw){
+    const s = nHead(raw);
+    if (!s) return null;
+    return PLE.find(p => p.id===s || nHead(p.short)===s || nHead(p.name)===s)
+      || PLE.find(p => nHead(p.name).indexOf(s)>=0 || s.indexOf(p.id)>=0 || s.indexOf(nHead(p.short))>=0);
+  }
 
   const SEED = [
     {id:"sample_anat_yl1",year:"YL1",name:"Gross Anatomy",code:"ANAT",blurb:"Back, limbs, and thorax — the map you will keep using on the wards.",qs:[
@@ -302,7 +323,7 @@
 
   function defaultState(){
     const s = buildSeed();
-    return { theme:"dark", courses:s.courses, questions:s.questions, attempts:[], itemStats:{}, session:null, seeded:true };
+    return { theme:"dark", courses:s.courses, questions:s.questions, boardQuestions:[], attempts:[], itemStats:{}, session:null, seeded:true };
   }
 
   function load(){
@@ -315,7 +336,7 @@
         const s = buildSeed();
         d.courses = s.courses; d.questions = s.questions; d.seeded = true;
       }
-      return Object.assign(defaultState(), d);
+      return Object.assign(defaultState(), d, { boardQuestions: d.boardQuestions||[] });
     } catch(e){ return defaultState(); }
   }
   function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e){} }
@@ -349,6 +370,8 @@
     if (parts.length===0) return {name:"hub"};
     if (parts[0]==="year" && parts[1]) return {name:"year", yl:parts[1]};
     if (parts[0]==="course" && parts[1]) return {name:"course", id:parts[1]};
+    if (parts[0]==="board" && parts[1]) return {name:"board-subject", id:parts[1]};
+    if (parts[0]==="board") return {name:"board"};
     if (parts[0]==="quiz") return {name:"quiz"};
     if (parts[0]==="results") return {name:"results"};
     if (parts[0]==="progress") return {name:"progress"};
@@ -379,6 +402,7 @@
       <a class="brand display" href="#/">${markSvg()}Plexus</a>
       <nav class="nav">
         <a href="#/" class="${r.name==="hub"?"on":""}">Home</a>
+        <a href="#/board" class="${r.name==="board"||r.name==="board-subject"||(r.name==="quiz"||r.name==="results")&&state.session&&state.session.kind==="board"?"on":""}">Board</a>
         <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
         <a href="#/about" class="${r.name==="about"?"on":""}">About</a>
         <a href="#/hosting" class="${r.name==="hosting"?"on":""}">File</a>
@@ -447,6 +471,7 @@
   }
 
   function startSession(cfg){
+    if (cfg.kind==="board") return startBoardSession(cfg);
     const courseMap = Object.fromEntries(state.courses.map(c => [c.id,c]));
     let pool;
     if (cfg.questionIds && cfg.questionIds.length){
@@ -468,6 +493,46 @@
       id: uid("ses"), title: cfg.title, kind: cfg.kind, courseId: cfg.courseId||null, year: cfg.year||null,
       quarter: cfg.quarter||null, week: cfg.week||null, coverage: cfg.coverage||null,
       mode: cfg.mode, shuffled: !!cfg.shuffle, timerSeconds: cfg.timerSeconds||0,
+      items, answers, timedOut:[], flagged:[], remainingMs, index:0, startedAt: Date.now(), finishedAt:null
+    };
+    save();
+    return true;
+  }
+  function boardCount(id){ return (state.boardQuestions||[]).filter(q => !id || q.subjectId===id).length; }
+  function boardPool(filter){
+    let pool = (state.boardQuestions||[]).slice();
+    if (filter && filter.subjectId) pool = pool.filter(q => q.subjectId===filter.subjectId);
+    if (filter && filter.day) pool = pool.filter(q => {
+      const p = pleById(q.subjectId); return p && p.day===Number(filter.day);
+    });
+    return pool;
+  }
+  function startBoardSession(cfg){
+    let pool;
+    if (cfg.questionIds && cfg.questionIds.length){
+      const byId = Object.fromEntries((state.boardQuestions||[]).map(q => [q.id,q]));
+      pool = cfg.questionIds.map(id => byId[id]).filter(Boolean);
+    } else {
+      pool = boardPool(cfg.boardFilter || {});
+    }
+    let items = pool.map(q => {
+      const p = pleById(q.subjectId) || { id:q.subjectId, short:"PLE", name:"PLE", day:0 };
+      return {
+        questionId:q.id, courseId:"ple_"+p.id, courseName:p.short, courseCode:p.short,
+        year:"PLE", quarter:p.day, week:0, coverage:p.name,
+        stem:q.stem, options:(q.options||[]).slice(), correctIndex:q.correctIndex, rationale:q.rationale||""
+      };
+    });
+    if (cfg.shuffle !== false) shuffle(items);
+    if (cfg.count > 0) items = items.slice(0, cfg.count);
+    if (!items.length) return false;
+    const answers={}, remainingMs={};
+    const timerSeconds = cfg.timerSeconds==null ? 60 : cfg.timerSeconds;
+    items.forEach(it => { answers[it.questionId]=null; if (timerSeconds>0) remainingMs[it.questionId]=timerSeconds*1000; });
+    state.session = {
+      id: uid("ses"), title: cfg.title, kind: "board", courseId: null, year: "PLE",
+      quarter: null, week: null, coverage: null, boardFilter: cfg.boardFilter||null,
+      mode: cfg.mode || "review", shuffled: true, timerSeconds,
       items, answers, timedOut:[], flagged:[], remainingMs, index:0, startedAt: Date.now(), finishedAt:null
     };
     save();
@@ -546,6 +611,7 @@
     const RAT=["rationale","explanation","explain","discussion","reason"];
     const COR=["correct","answer","correct_answer","correctanswer","key","ans"];
     const COV=["coverage","topic","week_coverage","weekcoverage","tag"];
+    const SUB=["subject","course","ple","ple_subject","subj"];
     const OPT=["options","choices","choices_text"];
     const COLS=[
       ["option_a","optiona","a","choice_a","choicea","option1","opt_a","opt1"],
@@ -555,7 +621,7 @@
       ["option_e","optione","e","choice_e","choicee","option5","opt_e","opt5"]
     ];
     const first = table[0].map(nHead);
-    const hasHeader = first.some(h => STEM.includes(h)||COR.includes(h)||RAT.includes(h)||h==="option_a"||h==="options"||h==="a");
+    const hasHeader = first.some(h => STEM.includes(h)||COR.includes(h)||RAT.includes(h)||h==="option_a"||h==="options"||h==="a"||h==="subject");
     let headers = first, body = table.slice(1);
     if (!hasHeader){ headers=["question","option_a","option_b","option_c","option_d","correct","rationale"]; body=table; }
     const rows=[];
@@ -572,7 +638,7 @@
       if (options.length>6) options = options.slice(0,6);
       const ci = resolveCorrect(lookup(map,COR), options);
       if (ci<0 || ci>=options.length){ errors.push({line,message:'Could not match correct answer. Use A–D or the option text.'}); return; }
-      rows.push({stem, options, correctIndex:ci, rationale, coverage});
+      rows.push({stem, options, correctIndex:ci, rationale, coverage, subject: lookup(map, SUB)});
     });
     return {rows, errors};
   }
@@ -682,8 +748,83 @@
           </tr>`).join("")}</tbody>
         </table>
       </div>` : `<p class="small muted" style="margin:0">No scored sets yet. Open a year and sit this week’s coverage.</p>`}
-      <p class="small subtle" style="margin-top:1.4rem;max-width:34rem">Sample stems fill the bank until I upload a CSV. Scores stay in this browser; Progress has the transfer file for the iPad.</p>
+      <p class="small subtle" style="margin-top:1.4rem;max-width:34rem">Sample stems fill the year bank until I upload a CSV. Board is a separate pool for the PLE. Scores stay in this browser.</p>
     `, true);
+  }
+
+  function viewBoard(){
+    const total = boardCount();
+    const last = state.attempts.filter(a => a.kind==="board").slice(0,6);
+    return shell(`
+      <p class="eyebrow">Physician Licensure Examination</p>
+      <h1 class="hero">Twelve subjects. Four days.</h1>
+      <p class="lead">PRC Board of Medicine. Import items by subject — same CSV as the year bank — then draw a random set from the pool: one subject, one day, or mixed.</p>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" type="button" data-act="ask-board-sim">Simulate a sitting</button>
+        <button class="btn ghost" type="button" data-act="csv-template-board">CSV template</button>
+      </div>
+      <p class="small muted" style="margin-top:.55rem">${total? total+" item"+(total===1?"":"s")+" in the PLE bank.":"Bank is empty. Open a subject and import a CSV."} Optional extra column: <span class="mono">subject</span>.</p>
+      ${[1,2,3,4].map(d => `
+        <p class="section">Day ${d}</p>
+        <div class="grid-3">
+          ${PLE.filter(p => p.day===d).map(p => {
+            const n = boardCount(p.id);
+            return `<a class="card year-card" href="#/board/${p.id}">
+              <p class="mono eyebrow">D${d}</p>
+              <h2>${esc(p.short)}</h2>
+              <p class="small muted" style="margin:0 0 .4rem">${esc(p.name)}</p>
+              <p class="small subtle" style="margin:0">${n? n+" in the pool":"No items yet"}</p>
+            </a>`;
+          }).join("")}
+        </div>`).join("")}
+      ${last.length?`<p class="section">Recent PLE sittings</p>
+        <div class="card" style="overflow:auto;padding:.4rem .9rem .2rem">
+          <table>
+            <thead><tr><th>When</th><th>Set</th><th>Score</th></tr></thead>
+            <tbody>${last.map(a => `<tr>
+              <td class="small mono">${new Date(a.at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</td>
+              <td>${esc(a.title)}</td>
+              <td class="mono">${a.correct}/${a.total} · ${pct(a.correct,a.total)}%</td>
+            </tr>`).join("")}</tbody>
+          </table>
+        </div>`:""}
+      <p class="small subtle" style="margin-top:1.4rem">Passing the PLE needs a 75% general average, with no subject below 50%. This is a sitting, not the exam.</p>
+    `, true);
+  }
+  function viewBoardSubject(id){
+    const p = pleById(id);
+    if (!p) return shell(`<p class="muted">That isn’t a PLE subject.</p><p><a class="btn" href="#/board">Board</a></p>`);
+    const n = boardCount(p.id);
+    return shell(`
+      <a class="small muted" href="#/board">← Twelve subjects</a>
+      <p class="mono eyebrow" style="margin-top:.8rem">Day ${p.day}</p>
+      <h1 class="hero">${esc(p.short)}</h1>
+      <p class="lead">${esc(p.name)}. ${n? n+" item"+(n===1?"":"s")+" in this pool.":"Nothing imported yet."}</p>
+      <div class="card" style="margin-top:1rem">
+        <p class="eyebrow" style="margin:0">Import</p>
+        <p class="small muted">Same CSV as weekly practice. First row: <span class="mono">question, option_a–d, correct, rationale</span>. Optional <span class="mono">subject</span>. Copies of the same stem stay once. Import again anytime — only new stems add.</p>
+        <div class="row" style="margin-top:.8rem">
+          <label class="btn">Import CSV<input id="board-csv" type="file" accept=".csv,text/csv,text/plain,.txt" multiple hidden /></label>
+          <button class="btn ghost" type="button" data-act="csv-template-board">CSV template</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:.75rem">
+        <p class="eyebrow" style="margin:0">Sit this subject</p>
+        <p class="small muted">Random draw from what is already in this pool. 60-second timer. Review shows the key after each item; Exam hides it until I stop.</p>
+        <div class="row" style="margin-top:.7rem;align-items:flex-end">
+          <label class="field" style="width:8rem">How many
+            <input id="board-n" type="number" min="1" max="${Math.max(1,n)}" value="${Math.min(20, Math.max(1,n))}" ${n?"":"disabled"} />
+          </label>
+          <label class="field" style="min-width:11rem">Mode
+            <select id="board-mode">
+              <option value="review">Review (see rationale)</option>
+              <option value="exam">Exam (end only)</option>
+            </select>
+          </label>
+          <button class="btn" type="button" data-act="start-board-subject" data-subject="${p.id}" ${n?"":"disabled"}>Start</button>
+        </div>
+      </div>
+    `);
   }
 
   function viewYear(yl){
@@ -857,7 +998,7 @@
       <div class="row" style="justify-content:space-between">
         <div>
           <p class="eyebrow" style="margin:0">${esc(ses.title)}</p>
-          <p class="small muted" style="margin:.2rem 0 0">${item.courseCode} · Q${item.quarter} · Week ${item.week}${item.coverage?" · "+esc(item.coverage):""}</p>
+          <p class="small muted" style="margin:.2rem 0 0">${item.year==="PLE" ? esc(item.coverage) : `${esc(item.courseCode)} · Q${item.quarter} · Week ${item.week}${item.coverage?" · "+esc(item.coverage):""}`}</p>
         </div>
         <div class="row">
           ${totalMs && !locked ? `<div class="timer ${secs<=10?"low":""}" style="--p:${p}"><span>${secs}</span></div>` : (timedOut?`<span class="badge">Timed out</span>`:"")}
@@ -910,7 +1051,7 @@
       </div>
       <p class="small muted">${fmtElapsed((ses.finishedAt||Date.now())-ses.startedAt)} · ${ses.shuffled?"Shuffled":"In order"} · ${ses.timerSeconds?ses.timerSeconds+"s timer":"No timer"}</p>
       <div class="row" style="margin:1rem 0">
-        <a class="btn" href="${ses.courseId?"#/course/"+ses.courseId:"#/"}">Back to the course</a>
+        <a class="btn" href="${ses.kind==="board"?"#/board": ses.courseId?"#/course/"+ses.courseId:"#/"}">${ses.kind==="board"?"Back to Board":"Back to the course"}</a>
         <button class="btn sec" data-act="retry">Sit it again</button>
       </div>
       <div class="card" style="overflow:auto">
@@ -925,7 +1066,7 @@
               <td class="mono">${i+1}</td>
               <td>${esc(it.stem.slice(0,90))}${it.stem.length>90?"…":""}</td>
               <td>${esc(it.courseCode)}</td>
-              <td>Q${it.quarter} W${it.week}</td>
+              <td>${it.year==="PLE"?"Day "+it.quarter:("Q"+it.quarter+" W"+it.week)}</td>
               <td style="color:${ok?"var(--correct)":"var(--wrong)"}">${yours}${ok?"": (timed?" to":"")}</td>
               <td>${LETTERS[it.correctIndex]}</td>
             </tr>`;
@@ -1109,6 +1250,8 @@
     if (r.name==="hub") html = viewHub();
     else if (r.name==="year") html = viewYear(r.yl);
     else if (r.name==="course") html = viewCourse(r.id);
+    else if (r.name==="board") html = viewBoard();
+    else if (r.name==="board-subject") html = viewBoardSubject(r.id);
     else if (r.name==="quiz") html = viewQuiz();
     else if (r.name==="results") html = viewResults();
     else if (r.name==="progress") html = viewProgress();
@@ -1179,6 +1322,13 @@
       ingestCsvFiles(list);
       file.value = "";
     };
+    const bcsv = document.getElementById("board-csv");
+    if (bcsv) bcsv.onchange = () => {
+      const files = [...(bcsv.files||[])];
+      const r = route();
+      bcsv.value = "";
+      if (files.length && r.name==="board-subject") ingestBoardCsv(files, r.id);
+    };
     const skip = document.getElementById("skip-dupes");
     if (skip) skip.onchange = () => {
       ui.skipDupes = skip.checked;
@@ -1206,6 +1356,7 @@
         state.theme = dump.theme || state.theme;
         state.courses = dump.courses;
         state.questions = dump.questions;
+        state.boardQuestions = dump.boardQuestions || state.boardQuestions || [];
         state.attempts = dump.attempts || [];
         state.itemStats = dump.itemStats || {};
         state.session = dump.session || null;
@@ -1256,6 +1407,46 @@
         toast(parts.length === 1 ? `Read ${parts[0].name}.` : `Read ${parts.length} files.`);
       })
       .catch(() => toast("Couldn’t read one of those files."));
+  }
+  function ingestBoardCsv(files, subjectId){
+    Promise.all([...files].map(f => f.text().then(text => ({name:f.name, text}))))
+      .then(list => {
+        let rows=[], errors=[];
+        list.forEach(f => {
+          const r = interpretCsv(f.text);
+          rows = rows.concat(r.rows);
+          r.errors.forEach(e => errors.push(Object.assign({file:f.name}, e)));
+        });
+        if (!rows.length){
+          const e0 = errors[0];
+          toast(e0 ? ((e0.file?e0.file+" ":"")+"line "+e0.line+": "+e0.message) : "No questions in that CSV.");
+          return;
+        }
+        if (!Array.isArray(state.boardQuestions)) state.boardQuestions = [];
+        const seen = new Set(state.boardQuestions.map(questionKey));
+        let added=0, dupes=0, skipped=0;
+        rows.forEach(r => {
+          const sub = matchPle(r.subject) || pleById(subjectId);
+          if (!sub){ skipped++; return; }
+          const k = questionKey(r);
+          if (!k) return;
+          if (seen.has(k)){ dupes++; return; }
+          seen.add(k);
+          state.boardQuestions.push({
+            id: uid("bq"), subjectId: sub.id, stem: r.stem,
+            options: r.options.slice(), correctIndex: r.correctIndex, rationale: r.rationale||""
+          });
+          added++;
+        });
+        save();
+        const bits = [added+" added to the PLE bank"];
+        if (dupes) bits.push(dupes+" copy skipped");
+        if (skipped) bits.push(skipped+" unmatched subject");
+        if (errors.length) bits.push(errors.length+" invalid");
+        toast(bits.join(" · "));
+        render();
+      })
+      .catch(() => toast("Couldn’t read that CSV."));
   }
 
   function pendingSplit(courseId){
@@ -1412,6 +1603,74 @@
       download((c?c.code.toLowerCase():"course")+".csv", questionsToCsv(qs), "text/csv");
       toast("CSV saved."); return;
     }
+    if (act==="csv-template-board"){
+      download("plexus-ple.csv", `question,option_a,option_b,option_c,option_d,correct,rationale,subject\n"Which nerve innervates serratus anterior?","Long thoracic","Thoracodorsal","Dorsal scapular","Suprascapular",A,"The long thoracic nerve (C5–C7) supplies serratus anterior.","Anatomy and Histology"\n"The sternal angle corresponds to which disc?","T2/T3","T4/T5","T6/T7","T8/T9",B,"The sternal angle of Louis marks T4/T5.","Anatomy and Histology"\n`, "text/csv");
+      toast("PLE template saved.");
+      return;
+    }
+    if (act==="ask-board-sim"){
+      const n = boardCount();
+      if (!n){ toast("Import items into the PLE bank first."); return; }
+      openModal(`<p class="eyebrow">Simulate a sitting</p>
+        <h3 style="margin:.3rem 0 .45rem">Random draw from the pool.</h3>
+        <p class="small muted">${n} available. Items shuffle. 60 seconds each.</p>
+        <label class="field">From
+          <select id="sim-from">
+            <option value="all">All twelve subjects</option>
+            <option value="day-1">Day 1 · Physio, legal, path</option>
+            <option value="day-2">Day 2 · Biochem, anatomy, micro</option>
+            <option value="day-3">Day 3 · OB-GYN, peds, preventive</option>
+            <option value="day-4">Day 4 · Pharma, surgery, medicine</option>
+            ${PLE.map(p => `<option value="sub-${p.id}">${esc(p.short)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field" style="margin-top:.6rem">How many items
+          <input id="sim-n" type="number" min="1" max="${n}" value="${Math.min(50,n)}" />
+        </label>
+        <label class="field" style="margin-top:.6rem">Mode
+          <select id="sim-mode">
+            <option value="exam">Exam (key at the end)</option>
+            <option value="review">Review (rationale after each)</option>
+          </select>
+        </label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="board-sim-go">Start</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="board-sim-go"){
+      const filter = {};
+      const from = ((document.getElementById("sim-from")||{}).value||"all");
+      if (from.indexOf("day-")===0) filter.day = Number(from.slice(4));
+      if (from.indexOf("sub-")===0) filter.subjectId = from.slice(4);
+      const n = Number((document.getElementById("sim-n")||{}).value||20);
+      const mode = ((document.getElementById("sim-mode")||{}).value||"exam");
+      const avail = boardPool(filter).length;
+      if (!avail){ toast("Nothing in that slice of the bank."); return; }
+      closeModal();
+      const label = filter.subjectId ? (pleById(filter.subjectId)||{}).short
+        : filter.day ? ("Day "+filter.day)
+        : "Mixed PLE";
+      const ok = startSession({
+        title: label+" · "+Math.min(n, avail)+" items",
+        kind: "board", boardFilter: filter, count: n, mode, shuffle: true, timerSeconds: 60
+      });
+      if (!ok){ toast("Nothing to sit."); return; }
+      go("#/quiz"); return;
+    }
+    if (act==="start-board-subject"){
+      const subjectId = t.dataset.subject;
+      const n = Number((document.getElementById("board-n")||{}).value||20);
+      const mode = ((document.getElementById("board-mode")||{}).value||"review");
+      const p = pleById(subjectId);
+      const ok = startSession({
+        title: (p?p.short:"PLE")+" · "+n,
+        kind: "board", boardFilter: { subjectId, n }, count: n, mode, shuffle: true, timerSeconds: 60
+      });
+      if (!ok){ toast("Import items first."); return; }
+      go("#/quiz"); return;
+    }
     if (act==="csv-template"){
       download("sample-week.csv", `question,option_a,option_b,option_c,option_d,correct,rationale,coverage\n"The long thoracic nerve innervates which muscle?","Latissimus dorsi","Serratus anterior","Trapezius","Rhomboid major",B,"The long thoracic nerve (C5–C7) supplies serratus anterior. Injury produces a winged scapula.","Upper limb"\n"Which vertebral level corresponds to the sternal angle?","T2/T3","T4/T5","T6/T7","T8/T9",B,"The sternal angle (of Louis) marks the T4/T5 disc.","Thorax"\n`, "text/csv");
       return;
@@ -1498,6 +1757,15 @@
     if (act==="do-finish"){ ui.confirmFinish=false; finishSession(); go("#/results"); return; }
     if (act==="retry"){
       const ses=state.session; if(!ses) return;
+      if (ses.kind==="board"){
+        const n = ses.items.length;
+        const ok = startSession({
+          title: ses.title, kind:"board", boardFilter: ses.boardFilter || {},
+          count: n, mode: ses.mode, shuffle: true, timerSeconds: ses.timerSeconds
+        });
+        if (!ok){ toast("Nothing left in that slice."); return; }
+        go("#/quiz"); return;
+      }
       startSession({ title:ses.title, kind:ses.kind, courseId:ses.courseId, year:ses.year, quarter:ses.quarter, week:ses.week, coverage:ses.coverage,
         mode:ses.mode, shuffle:true, timerSeconds:ses.timerSeconds, count:0, questionIds: ses.items.map(i=>i.questionId) });
       go("#/quiz"); return;
@@ -1511,6 +1779,7 @@
         theme: state.theme,
         courses: state.courses,
         questions: state.questions,
+        boardQuestions: state.boardQuestions || [],
         attempts: state.attempts,
         itemStats: state.itemStats,
         session: state.session,
@@ -1531,7 +1800,7 @@
     if (act==="wipe"){
       if (!confirm("Start over? This deletes my courses and questions on this device.")) return;
       const s=buildSeed();
-      state.courses=s.courses; state.questions=s.questions; state.attempts=[]; state.itemStats={}; state.session=null; state.seeded=true;
+      state.courses=s.courses; state.questions=s.questions; state.boardQuestions=state.boardQuestions||[]; state.attempts=[]; state.itemStats={}; state.session=null; state.seeded=true;
       save(); toast("Back to the sample items."); go("#/"); return;
     }
     if (act==="save-html"){
