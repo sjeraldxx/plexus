@@ -67,13 +67,16 @@
       padding: .35rem 1rem;
     }
     .brand { display: flex; align-items: center; gap: .55rem; font-size: 1.05rem; }
-    .nav { display: flex; align-items: center; gap: .15rem; }
+    .nav { display: flex; align-items: center; gap: .15rem; flex-wrap: wrap; justify-content: flex-end; }
     .nav a, .icon-btn {
       display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 .7rem;
       border-radius: .5rem; color: var(--muted); border: 0; background: transparent; cursor: pointer; font-size: .9rem;
     }
     .nav a:hover, .icon-btn:hover, .nav a.on { background: var(--elevated); color: var(--fg); }
-    main { max-width: 68rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    main { max-width: 68rem; margin: 0 auto; padding: 1.15rem 1rem 3rem; }
+    @media (orientation: landscape) and (max-height: 820px) {
+      main { padding: .9rem 1.1rem 2.2rem; }
+    }
     main.narrow { max-width: 44rem; }
     .eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0; }
     .hero { font-size: clamp(1.4rem, 2.6vw, 1.85rem); line-height: 1.2; margin: .35rem 0 0; }
@@ -92,15 +95,58 @@
       box-shadow: var(--shadow); transition: box-shadow .15s; border: 0;
     }
     a.card:hover, button.card:hover { box-shadow: var(--shadow-h); }
-    .grid-7 { display: grid; gap: .55rem; }
+    .grid-7 { display: grid; gap: .5rem; grid-template-columns: 1fr; }
     .grid-2 { display: grid; gap: .65rem; }
-    .grid-3 { display: grid; gap: .65rem; }
+    .grid-3 { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
     @media (min-width: 720px) {
       .grid-2 { grid-template-columns: 1fr 1fr; }
-      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-      .grid-7 { grid-template-columns: repeat(2, 1fr); }
     }
-    @media (min-width: 1020px) { .grid-7 { grid-template-columns: repeat(7, 1fr); } }
+    @media (min-width: 900px) and (orientation: landscape) {
+      .grid-7 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (orientation: portrait) and (min-width: 700px) {
+      .grid-7 { grid-template-columns: 1fr; }
+    }
+    .course-row {
+      display: grid;
+      grid-template-columns: 4.6rem minmax(0, 1fr);
+      grid-template-areas:
+        "code title"
+        "code meta"
+        "code bar";
+      gap: .2rem 1rem;
+      align-items: center;
+      min-height: 4.4rem;
+      padding: .9rem 1.05rem;
+    }
+    .course-row .code { grid-area: code; align-self: center; }
+    .course-row h2 {
+      grid-area: title; font-size: 1.05rem; line-height: 1.28; margin: 0;
+      font-weight: 600; letter-spacing: -.01em;
+    }
+    .course-row .meta { grid-area: meta; margin: 0; }
+    .course-row .side { grid-area: meta; margin: 0; }
+    .course-row .bar-read { grid-area: bar; margin: .2rem 0 0; }
+    @media (min-width: 700px) {
+      .course-row {
+        grid-template-columns: 4.8rem minmax(0, 1fr) auto;
+        grid-template-areas:
+          "code title side"
+          "code meta  side"
+          "code bar   bar";
+      }
+      .course-row .side { grid-area: side; justify-self: end; align-self: center; text-align: right; max-width: 13rem; }
+    }
+    @media (max-width: 520px) {
+      .course-row {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "code"
+          "title"
+          "meta"
+          "bar";
+      }
+    }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
       min-height: 2.4rem; padding: 0 .95rem; border-radius: .65rem; border: 0; cursor: pointer;
@@ -133,7 +179,8 @@
       background: var(--elevated); color: var(--muted); font-size: .8rem; font-weight: 600;
     }
     .shiftbar button.on { background: var(--accent); color: var(--accent-fg); }
-    .heat { display: grid; grid-template-columns: 7.5rem repeat(8, 1fr); gap: .28rem; align-items: center; }
+    .heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .heat { display: grid; grid-template-columns: 4.6rem repeat(8, minmax(2.1rem, 1fr)); gap: .28rem; align-items: center; min-width: 28rem; }
     .heat .lab { font-size: .75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .cell {
       aspect-ratio: 1; border-radius: .4rem; background: var(--elevated); cursor: pointer; border: 0;
@@ -310,8 +357,18 @@
   function markSvg(){
     return `<svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
       <rect width="32" height="32" rx="7" fill="var(--elevated)"/>
-      <path d="M7 22h18M7 16h12M7 10h18" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="16" cy="16" r="7.2" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <path d="M16 10.5v5.5l3.4 2.1" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
     </svg>`;
+  }
+  function displayName(c){
+    let n = String(c.name||"");
+    const code = String(c.code||"");
+    if (code && n.toUpperCase().replace(/\s+/g,"").startsWith(code.toUpperCase().replace(/\s+/g,""))) {
+      const re = new RegExp("^"+code.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*","i");
+      n = n.replace(re, "").replace(/^[\s\-–:]+/, "");
+    }
+    return n || c.name;
   }
   function shell(inner, wide){
     const r = route();
@@ -367,12 +424,19 @@
         ${state.courses.map(c => {
           const cell = getCell(shifting, week, c.id);
           const nEx = examsFor(shifting, week, c.id).length;
-          return `<a class="card" href="#/c/${c.id}" style="min-height:9.5rem;display:flex;flex-direction:column">
-            <p class="mono eyebrow">${esc(c.code)}</p>
-            <h2 style="font-size:1.05rem;margin:.3rem 0 .4rem">${esc(c.name)}</h2>
-            <p class="small muted" style="flex:1;margin:0">${esc((cell.topics||"").trim() || "No coverage logged")}</p>
-            <div class="bar-read" style="margin:.55rem 0 .35rem"><span style="width:${cell.reading}%"></span></div>
-            <p class="small subtle" style="margin:0">${cell.confidence?CONF[cell.confidence]: "No confidence"} · ${cell.reading}%${nEx?` · ${nEx} exam`:""}${(cell.notes||"").trim()?" · notes":""}</p>
+          const title = displayName(c);
+          const bits = [
+            cell.confidence ? CONF[cell.confidence] : "No confidence",
+            cell.reading + "%",
+            nEx ? nEx+" exam" : "",
+            (cell.notes||"").trim() ? "notes" : ""
+          ].filter(Boolean);
+          return `<a class="card course-row" href="#/c/${c.id}">
+            <p class="mono eyebrow code">${esc(c.code)}</p>
+            <h2>${esc(title)}</h2>
+            <p class="small muted meta">${esc((cell.topics||"").trim() || "No coverage logged")}</p>
+            <p class="small subtle side">${esc(bits.join(" · "))}</p>
+            <div class="bar-read"><span style="width:${cell.reading}%"></span></div>
           </a>`;
         }).join("")}
       </div>
@@ -391,7 +455,7 @@
       <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.7rem">
         <div>
           <p class="eyebrow">${esc(c.code)}</p>
-          <h1 class="hero">${esc(c.name)}</h1>
+          <h1 class="hero">${esc(displayName(c))}</h1>
           <p class="lead">Week ${week} of shifting ${shifting}.</p>
         </div>
         <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Rename</button>
@@ -562,7 +626,7 @@
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
-      <div class="card" style="margin-top:1rem;overflow:auto">
+      <div class="card heat-wrap" style="margin-top:1rem">
         <div class="heat" style="margin-bottom:.4rem">
           <div></div>
           ${Array.from({length:WEEKS},(_,i)=>`<div class="small subtle" style="text-align:center">W${i+1}</div>`).join("")}
