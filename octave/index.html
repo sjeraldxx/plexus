@@ -269,11 +269,27 @@
     .weekmean { display: grid; grid-template-columns: repeat(8, 1fr); gap: .3rem; align-items: end; height: 5.5rem; }
     .weekmean .col { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; gap: .2rem; }
     .weekmean .fill { background: var(--accent); border-radius: .3rem .3rem 0 0; min-height: 2px; }
+    .pdf-overlay {
+      position: fixed; inset: 0; z-index: 45; background: var(--bg);
+      display: flex; flex-direction: column;
+    }
+    .pdf-overlay .pdf-top {
+      display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+      padding: .45rem 1rem; border-bottom: 1px solid var(--border); flex: none;
+    }
+    .pdf-overlay .pdf-top p { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pdf-overlay iframe, .pdf-overlay embed {
+      flex: 1; width: 100%; border: 0; background: #0e0f14;
+    }
+    .pdf-overlay img {
+      flex: 1; width: 100%; object-fit: contain; background: #0e0f14;
+    }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div id="modal"></div>
+  <div id="pdfview"></div>
   <div id="toast" class="toast" hidden></div>
   <script>
 (function () {
@@ -358,7 +374,7 @@
   function go(hash){ location.hash = hash; }
 
   function key(s,w,c){ return s+"-"+w+"-"+c; }
-  function emptyCell(){ return { topics:"", pages:"", reading:0, confidence:0, notes:"", hours:0, refReads:[], updatedAt:0 }; }
+  function emptyCell(){ return { topics:"", pages:"", reading:0, confidence:0, notes:"", hours:0, refReads:[], docs:{ lecture:[], revised:[] }, updatedAt:0 }; }
   function getCell(s,w,c){ return Object.assign(emptyCell(), state.cells[key(s,w,c)]||{}); }
   function putCell(s,w,c, patch){
     const cur = getCell(s,w,c);
@@ -609,6 +625,136 @@
   function csvHint(){
     return `<p class="small muted">CSV first row, in this order: <span class="mono">${CSV_HEADER}</span>. <code>correct</code> is A, B, C, or D. Quote any cell that has a comma. Multiple files are fine — copies of the same stem are kept once.</p>`;
   }
+  const IDB_NAME = "octave-files-v1";
+  const MAX_PDF = 30 * 1024 * 1024;
+  function idbOpen(){
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains("files")) req.result.createObjectStore("files"); };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  }
+  function idbPut(id, blob){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction("files", "readwrite");
+      tx.objectStore("files").put(blob, id);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+  function idbGet(id){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const r = db.transaction("files", "readonly").objectStore("files").get(id);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => rej(r.error);
+    }));
+  }
+  function idbDel(id){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction("files", "readwrite");
+      tx.objectStore("files").delete(id);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+  function idbClear(){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction("files", "readwrite");
+      tx.objectStore("files").clear();
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    })).catch(() => {});
+  }
+  function fmtSize(n){
+    n = Number(n)||0;
+    if (n < 1024) return n+" B";
+    if (n < 1048576) return (n/1024).toFixed(1)+" KB";
+    return (n/1048576).toFixed(1)+" MB";
+  }
+  function cellDocs(cell, kind){
+    const d = (cell && cell.docs) || {};
+    return Array.isArray(d[kind]) ? d[kind] : [];
+  }
+  function allDocMetas(cell){
+    return cellDocs(cell, "lecture").concat(cellDocs(cell, "revised"));
+  }
+  function fileSlot(kind, title, help, cell, courseId){
+    const files = cellDocs(cell, kind);
+    return `<div class="card stack" style="margin-top:.7rem">
+      <p class="eyebrow">${esc(title)}</p>
+      <p class="small muted" style="margin:0">${esc(help)}</p>
+      ${files.map(f => `<div class="row" style="justify-content:space-between;align-items:center">
+        <p class="small" style="margin:0">${esc(f.name)} · ${fmtSize(f.size)}</p>
+        <div class="row">
+          <button class="btn sm" type="button" data-act="view-file" data-id="${courseId}" data-kind="${kind}" data-fid="${f.id}">View</button>
+          <button class="btn ghost sm" type="button" data-act="del-file" data-id="${courseId}" data-kind="${kind}" data-fid="${f.id}">Remove</button>
+        </div>
+      </div>`).join("")}
+      <div class="row">
+        <label class="btn sec">Upload PDF<input class="pdf-in" type="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp" multiple hidden data-id="${courseId}" data-kind="${kind}" /></label>
+      </div>
+      <p class="small subtle" style="margin:0">Stays on this device. Not in the transfer file. Up to 30 MB each.</p>
+    </div>`;
+  }
+  function notesAndFiles(id, cell, exams){
+    return `<p class="section">Study notes</p>
+      ${fileSlot("lecture", "Lecture PDF", "Slides, chapters, or a scan of this week. Opens on this page.", cell, id)}
+      <p class="section">High-yield notes</p>
+      <div class="card">
+        <textarea id="notes" class="notes" placeholder="What I would want the night before the exam.">${esc(cell.notes)}</textarea>
+        <p class="small subtle" style="margin:.5rem 0 0">Typed here. Autosaves as I type.</p>
+      </div>
+      <p class="section">Revised notes</p>
+      ${fileSlot("revised", "Revision PDF", "The cleaned version I open when I sit the practice set.", cell, id)}
+      ${practiceSetBlock(id, exams)}`;
+  }
+  let blobUrl = null;
+  function closePdf(){
+    const root = document.getElementById("pdfview");
+    if (root) root.innerHTML = "";
+    if (blobUrl){ URL.revokeObjectURL(blobUrl); blobUrl = null; }
+  }
+  function openPdfMeta(meta){
+    idbGet(meta.id).then(blob => {
+      if (!blob){ toast("That file is not on this device. Upload it again."); return; }
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl = URL.createObjectURL(blob);
+      const isImg = String(meta.type||blob.type||"").indexOf("image/")===0;
+      const stage = isImg
+        ? `<img src="${blobUrl}" alt="${esc(meta.name)}" />`
+        : `<iframe src="${blobUrl}#toolbar=1&navpanes=0" title="${esc(meta.name)}"></iframe>`;
+      document.getElementById("pdfview").innerHTML = `<div class="pdf-overlay">
+        <div class="pdf-top">
+          <p class="small">${esc(meta.name)}</p>
+          <div class="row">
+            <a class="btn ghost sm" href="${blobUrl}" download="${esc(meta.name)}">Download</a>
+            <a class="btn ghost sm" href="${blobUrl}" target="_blank" rel="noopener">Open tab</a>
+            <button class="btn" type="button" data-act="close-pdf">Close</button>
+          </div>
+        </div>
+        ${stage}
+      </div>`;
+    }).catch(() => toast("Could not open that file."));
+  }
+  function ingestPdfs(files, courseId, kind){
+    const list = [...files];
+    if (!list.length) return;
+    const too = list.find(f => f.size > MAX_PDF);
+    if (too){ toast(too.name+" is over 30 MB."); return; }
+    Promise.all(list.map(f => {
+      const id = uid("pdf");
+      return idbPut(id, f).then(() => ({ id, name: f.name, size: f.size, type: f.type || "application/pdf" }));
+    })).then(metas => {
+      const cell = getCell(cur().shifting, cur().week, courseId);
+      const docs = Object.assign({ lecture: [], revised: [] }, cell.docs || {});
+      docs[kind] = cellDocs(cell, kind).concat(metas);
+      putCell(cur().shifting, cur().week, courseId, { docs });
+      toast(metas.length+" file"+(metas.length===1?"":"s")+" on this device.");
+      render();
+    }).catch(() => toast("Could not save that file on this device."));
+  }
+
   function practiceSetBlock(id, exams){
     return `<p class="section">Practice set</p>
       <div class="row" style="margin-bottom:.55rem">
@@ -691,7 +837,11 @@
   function removeCourse(id, dropData){
     state.courses = state.courses.filter(c => c.id!==id);
     if (!dropData) return;
-    Object.keys(state.cells).forEach(k => { if (k.endsWith("-"+id)) delete state.cells[k]; });
+    Object.keys(state.cells).forEach(k => {
+      if (!k.endsWith("-"+id)) return;
+      allDocMetas(state.cells[k]||{}).forEach(f => idbDel(f.id));
+      delete state.cells[k];
+    });
     state.exams = state.exams.filter(e => e.courseId!==id);
     state.attempts = state.attempts.filter(a => a.courseId!==id);
     if (state.session && state.session.courseId===id) state.session = null;
@@ -800,7 +950,8 @@
             cell.confidence ? interpretConf(cell.confidence).title : "No confidence",
             cell.reading + "%",
             nEx ? nEx+" exam" : "",
-            (cell.notes||"").trim() ? "notes" : ""
+            (cell.notes||"").trim() ? "notes" : "",
+            allDocMetas(cell).length ? allDocMetas(cell).length+" PDF" : ""
           ].filter(Boolean);
           const emptyYear = "Year compre. All four shiftings — no weekly lecture list.";
           const emptyLong = "Long exam. The shifting as a whole — no weekly lecture list.";
@@ -861,12 +1012,7 @@
         </div>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
-      <p class="section">High-yield notes</p>
-      <div class="card">
-        <textarea id="notes" class="notes" placeholder="What I would want the night before the long exam.">${esc(cell.notes)}</textarea>
-        <p class="small subtle" style="margin:.5rem 0 0">Saved with this week. Autosaves as I type.</p>
-      </div>
-      ${practiceSetBlock(id, exams)}`;
+      ${notesAndFiles(id, cell, exams)}`;
     const longBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
@@ -891,12 +1037,7 @@
         </div>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
-      <p class="section">High-yield notes</p>
-      <div class="card">
-        <textarea id="notes" class="notes" placeholder="What I would want the night before the long exam.">${esc(cell.notes)}</textarea>
-        <p class="small subtle" style="margin:.5rem 0 0">Saved with this long exam. Autosaves as I type.</p>
-      </div>
-      ${practiceSetBlock(id, exams)}
+      ${notesAndFiles(id, cell, exams)}
       <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This is the shifting as a whole.</p>`;
     const yearBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
@@ -922,12 +1063,7 @@
         </div>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
-      <p class="section">High-yield notes</p>
-      <div class="card">
-        <textarea id="notes" class="notes" placeholder="What I would want walking into compre.">${esc(cell.notes)}</textarea>
-        <p class="small subtle" style="margin:.5rem 0 0">Saved with the year compre. Autosaves as I type.</p>
-      </div>
-      ${practiceSetBlock(id, exams)}
+      ${notesAndFiles(id, cell, exams)}
       <p class="small subtle" style="margin-top:1rem">This is not a week and not a shifting. It is everything from shifting 1 through 4.</p>`;
     return shell(`
       <a class="small muted" href="#/">← ${esc(slotLabel(shifting, week))}</a>
@@ -1203,7 +1339,7 @@
       </div>
       <p class="section">This device</p>
       <div class="card">
-        <p class="small muted" style="margin-top:0">Laptop and iPad do not share this log. Save a transfer file, then restore on the other one.</p>
+        <p class="small muted" style="margin-top:0">Laptop and iPad do not share this log. PDFs stay on the device that received them. Save a transfer file for scores and typed notes, then restore on the other one.</p>
         <div class="row">
           <button class="btn" type="button" data-act="export">Save transfer file</button>
           <label class="btn sec">Restore<input id="restore" type="file" accept="application/json,.json" hidden /></label>
@@ -1349,6 +1485,24 @@
         ingestCsvFiles(files, courseId, examId);
       };
     });
+    document.querySelectorAll("input.pdf-in").forEach(el => {
+      el.onchange = () => {
+        const files = [...(el.files||[])];
+        const courseId = el.getAttribute("data-id");
+        const kind = el.getAttribute("data-kind");
+        el.value = "";
+        if (!files.length) return;
+        ingestPdfs(files, courseId, kind);
+      };
+    });
+    const pdfview = document.getElementById("pdfview");
+    if (pdfview && !pdfview._bound){
+      pdfview._bound = true;
+      pdfview.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-act]");
+        if (t && t.getAttribute("data-act")==="close-pdf"){ e.preventDefault(); closePdf(); }
+      });
+    }
     window.onkeydown = (e) => {
       if (e.key==="Escape" && document.querySelector(".overlay")) closeModal();
     };
@@ -1545,6 +1699,27 @@
       toast("Template saved — fill it, then Import CSV.");
       return;
     }
+    if (act==="view-file"){
+      const cell = getCell(cur().shifting, cur().week, t.dataset.id);
+      const meta = allDocMetas(cell).find(f => f.id===t.dataset.fid);
+      if (!meta){ toast("That file isn’t listed."); return; }
+      openPdfMeta(meta);
+      return;
+    }
+    if (act==="del-file"){
+      const cell = getCell(cur().shifting, cur().week, t.dataset.id);
+      const docs = Object.assign({ lecture: [], revised: [] }, cell.docs || {});
+      const kind = t.dataset.kind;
+      const fid = t.dataset.fid;
+      docs[kind] = cellDocs(cell, kind).filter(f => f.id!==fid);
+      idbDel(fid);
+      putCell(cur().shifting, cur().week, t.dataset.id, { docs });
+      closePdf();
+      toast("Removed.");
+      render();
+      return;
+    }
+    if (act==="close-pdf"){ closePdf(); return; }
     if (act==="new-exam"){
       openModal(`<p class="eyebrow">New exam</p>
         <h3 style="margin:.3rem 0 1rem">For this week</h3>
@@ -1629,6 +1804,7 @@
       state.attempts = [];
       state.session = null;
       state.cursor = { shifting: 1, week: 1 };
+      idbClear();
       save(); closeModal(); toast("New year. Desk is empty."); go("#/"); return;
     }
     if (act==="ask-wipe"){
@@ -1646,6 +1822,7 @@
       state = defaultState();
       state.theme = theme;
       document.documentElement.classList.toggle("light", state.theme==="light");
+      idbClear();
       save(); closeModal(); toast("Wiped."); go("#/setup"); return;
     }
     if (act==="export"){
