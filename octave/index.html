@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Octave · reading log</title>
+  <meta name="description" content="Four shiftings, eight weeks, seven courses. Readings, revision notes, practice exams, weekly confidence." />
+  <meta name="theme-color" content="#13141a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,650&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #13141a;
+      --surface: #1b1c24;
+      --elevated: #24252f;
+      --fg: #eeece6;
+      --muted: #9a958c;
+      --subtle: #6e6a64;
+      --accent: #c4b183;
+      --accent-fg: #13141a;
+      --border: rgba(238,236,230,.09);
+      --correct: #86a88a;
+      --wrong: #c98983;
+      --shadow: 0 0 0 1px rgba(238,236,230,.07);
+      --shadow-h: 0 0 0 1px rgba(238,236,230,.14);
+      color-scheme: dark;
+    }
+    html.light {
+      --bg: #f3f0e8;
+      --surface: #faf8f3;
+      --elevated: #fff;
+      --fg: #1c1b18;
+      --muted: #5e5a54;
+      --subtle: #8a8580;
+      --accent: #7a6840;
+      --accent-fg: #f3f0e8;
+      --border: rgba(28,27,24,.1);
+      --correct: #2f6b48;
+      --wrong: #9a4038;
+      --shadow: 0 0 0 1px rgba(28,27,24,.06), 0 1px 2px rgba(28,27,24,.04);
+      --shadow-h: 0 0 0 1px rgba(28,27,24,.1), 0 8px 24px rgba(28,27,24,.06);
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+      min-height: 100dvh; line-height: 1.5; font-size: 16px;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+    h1,h2,h3,.display,.stem { font-family: "Source Serif 4", "Times New Roman", serif; font-weight: 600; letter-spacing: -.015em; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    button, a, input, select, label { touch-action: manipulation; }
+    header.app {
+      position: sticky; top: 0; z-index: 20;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .bar {
+      max-width: 68rem; margin: 0 auto; min-height: 3.15rem;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .35rem 1rem;
+    }
+    .brand { display: flex; align-items: center; gap: .55rem; font-size: 1.05rem; }
+    .nav { display: flex; align-items: center; gap: .15rem; }
+    .nav a, .icon-btn {
+      display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 .7rem;
+      border-radius: .5rem; color: var(--muted); border: 0; background: transparent; cursor: pointer; font-size: .9rem;
+    }
+    .nav a:hover, .icon-btn:hover, .nav a.on { background: var(--elevated); color: var(--fg); }
+    main { max-width: 68rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    main.narrow { max-width: 44rem; }
+    .eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0; }
+    .hero { font-size: clamp(1.4rem, 2.6vw, 1.85rem); line-height: 1.2; margin: .35rem 0 0; }
+    .lead { max-width: 38rem; color: var(--muted); font-size: .95rem; margin: .4rem 0 0; }
+    .section { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--subtle); margin: 1.35rem 0 .55rem; }
+    .stem { font-size: 1.18rem; line-height: 1.45; font-weight: 500; margin: .35rem 0 0; }
+    .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .badge {
+      display: inline-flex; align-items: center; min-height: 1.45rem; padding: 0 .5rem;
+      border-radius: 999px; font-size: .7rem; letter-spacing: .03em;
+      background: var(--elevated); color: var(--muted); box-shadow: var(--shadow);
+    }
+    .badge.accent { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+    .card {
+      background: var(--surface); border-radius: 1rem; padding: 1rem 1.1rem;
+      box-shadow: var(--shadow); transition: box-shadow .15s; border: 0;
+    }
+    a.card:hover, button.card:hover { box-shadow: var(--shadow-h); }
+    .grid-7 { display: grid; gap: .55rem; }
+    .grid-2 { display: grid; gap: .65rem; }
+    .grid-3 { display: grid; gap: .65rem; }
+    @media (min-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+      .grid-7 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1020px) { .grid-7 { grid-template-columns: repeat(7, 1fr); } }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      min-height: 2.4rem; padding: 0 .95rem; border-radius: .65rem; border: 0; cursor: pointer;
+      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .88rem;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.sec { background: var(--elevated); color: var(--fg); box-shadow: var(--shadow); }
+    .btn.ghost { background: transparent; color: var(--muted); }
+    .btn.ghost:hover { color: var(--fg); background: var(--elevated); }
+    .btn.sm { min-height: 2.15rem; padding: 0 .7rem; font-size: .8rem; }
+    .btn.warn { background: color-mix(in srgb, var(--wrong) 22%, transparent); color: var(--wrong); }
+    .muted { color: var(--muted); } .subtle { color: var(--subtle); } .small { font-size: .875rem; }
+    .stack { display: grid; gap: .7rem; }
+    label.field { display: grid; gap: .35rem; font-size: .8rem; color: var(--muted); }
+    input[type=text], input[type=number], select, textarea {
+      background: var(--elevated); border: 1px solid var(--border); border-radius: .75rem;
+      padding: .7rem .85rem; outline: none; width: 100%; font-size: 16px;
+    }
+    textarea { min-height: 8rem; resize: vertical; line-height: 1.55; }
+    textarea.notes { font-family: "Source Serif 4", serif; font-size: 1.02rem; min-height: 14rem; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    .weekbar { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .weekbar button {
+      width: 2.4rem; height: 2.4rem; border-radius: .55rem; border: 0; cursor: pointer;
+      background: var(--elevated); color: var(--muted); font-weight: 600; font-size: .85rem;
+    }
+    .weekbar button.on { background: var(--accent); color: var(--accent-fg); }
+    .shiftbar button {
+      min-height: 2.15rem; padding: 0 .75rem; border-radius: 999px; border: 0; cursor: pointer;
+      background: var(--elevated); color: var(--muted); font-size: .8rem; font-weight: 600;
+    }
+    .shiftbar button.on { background: var(--accent); color: var(--accent-fg); }
+    .heat { display: grid; grid-template-columns: 7.5rem repeat(8, 1fr); gap: .28rem; align-items: center; }
+    .heat .lab { font-size: .75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cell {
+      aspect-ratio: 1; border-radius: .4rem; background: var(--elevated); cursor: pointer; border: 0;
+      min-height: 1.7rem;
+    }
+    .cell.c1 { background: color-mix(in srgb, var(--wrong) 55%, var(--elevated)); }
+    .cell.c2 { background: color-mix(in srgb, #c4a070 55%, var(--elevated)); }
+    .cell.c3 { background: color-mix(in srgb, var(--accent) 45%, var(--elevated)); }
+    .cell.c4 { background: color-mix(in srgb, #8faf88 55%, var(--elevated)); }
+    .cell.c5 { background: color-mix(in srgb, var(--correct) 70%, var(--elevated)); }
+    .cell.on { outline: 2px solid var(--fg); outline-offset: 1px; }
+    .conf { display: flex; flex-wrap: wrap; gap: .35rem; }
+    .conf button {
+      min-height: 2.35rem; padding: 0 .7rem; border-radius: .55rem; border: 0; cursor: pointer;
+      background: var(--elevated); color: var(--muted); font-size: .78rem; font-weight: 600;
+    }
+    .conf button.on { background: var(--accent); color: var(--accent-fg); }
+    .bar-read { height: .35rem; background: var(--elevated); border-radius: 99px; overflow: hidden; }
+    .bar-read > span { display: block; height: 100%; background: var(--accent); }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    .opt {
+      display: flex; gap: .8rem; align-items: flex-start; width: 100%; text-align: left;
+      background: var(--elevated); border: 1px solid transparent; border-radius: 1rem;
+      padding: .95rem 1rem; cursor: pointer; color: var(--fg); min-height: 3rem;
+    }
+    .opt:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+    .opt .ltr {
+      flex: none; width: 1.75rem; height: 1.75rem; border-radius: .5rem;
+      display: grid; place-items: center; background: var(--surface); font-size: .8rem; font-weight: 600;
+    }
+    .opt.ok { background: color-mix(in srgb, var(--correct) 16%, var(--elevated)); }
+    .opt.bad { background: color-mix(in srgb, var(--wrong) 16%, var(--elevated)); }
+    .opt:disabled { cursor: default; }
+    .rationale { background: var(--elevated); border-radius: .85rem; padding: .85rem 1rem; font-size: .92rem; }
+    .toast {
+      position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem; z-index: 50;
+      background: var(--elevated); color: var(--fg); padding: .75rem 1rem; border-radius: .8rem;
+      box-shadow: var(--shadow-h); font-size: .875rem; max-width: min(22rem, calc(100vw - 2rem));
+    }
+    .overlay {
+      position: fixed; inset: 0; background: rgba(8,10,12,.62); z-index: 40;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    @media (min-width: 720px) { .overlay { align-items: center; padding: 1.25rem; } }
+    .modal {
+      background: var(--surface); width: min(28rem, 100%); max-height: min(92dvh, 100%); overflow: auto;
+      padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+      box-shadow: var(--shadow-h); border-radius: 1.25rem 1.25rem 0 0;
+    }
+    @media (min-width: 720px) { .modal { border-radius: 1.25rem; } }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th { text-align: left; color: var(--subtle); font-weight: 500; padding: .45rem .3rem; }
+    td { padding: .5rem .3rem; border-top: 1px solid var(--border); }
+    .stat { background: var(--surface); border-radius: 1rem; padding: .7rem .9rem; box-shadow: var(--shadow); }
+    .stat .k { font-size: .7rem; color: var(--muted); margin: 0; letter-spacing: .04em; text-transform: uppercase; }
+    .stat .v { font-family: "Source Serif 4", serif; font-size: 1.25rem; margin: .15rem 0 0; font-variant-numeric: tabular-nums; }
+    .weekmean { display: grid; grid-template-columns: repeat(8, 1fr); gap: .3rem; align-items: end; height: 5.5rem; }
+    .weekmean .col { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; gap: .2rem; }
+    .weekmean .fill { background: var(--accent); border-radius: .3rem .3rem 0 0; min-height: 2px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="modal"></div>
+  <div id="toast" class="toast" hidden></div>
+  <script>
+(function () {
+  "use strict";
+  const STORE = "octave-v1";
+  const SHIFTINGS = 4;
+  const WEEKS = 8;
+  const LETTERS = ["A","B","C","D"];
+  const CONF = ["—", "Lost", "Recognize", "With notes", "Cold", "Exam-ready"];
+
+  function uid(p){ return p + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+  function esc(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, c => ({
+      "&": "&"+"amp;", "<": "&"+"lt;", ">": "&"+"gt;", '"': "&"+"quot;", "'": "&#39;"
+    }[c]));
+  }
+  function pct(n,d){ return d<=0 ? 0 : Math.round(n/d*100); }
+
+  function defaultCourses(){
+    return Array.from({length:7}, (_,i) => ({
+      id: "c"+(i+1), name: "Course "+(i+1), code: "C"+(i+1)
+    }));
+  }
+  function defaultState(){
+    return {
+      theme: "dark",
+      named: false,
+      cursor: { shifting: 1, week: 1 },
+      courses: defaultCourses(),
+      cells: {},
+      exams: [],
+      attempts: [],
+      session: null
+    };
+  }
+  function load(){
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (!raw) return defaultState();
+      const d = JSON.parse(raw);
+      return Object.assign(defaultState(), d, { cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[], courses: (d.courses&&d.courses.length)?d.courses:defaultCourses() });
+    } catch(e){ return defaultState(); }
+  }
+  function save(){
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e){}
+  }
+
+  let state = load();
+  document.documentElement.classList.toggle("light", state.theme==="light");
+  let toastT = null;
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { el.hidden = true; }, 2400);
+  }
+
+  function route(){
+    const h = (location.hash || "#/").replace(/^#/, "") || "/";
+    const parts = h.split("/").filter(Boolean);
+    if (!parts.length) return {name:"hub"};
+    if (parts[0]==="setup") return {name:"setup"};
+    if (parts[0]==="c" && parts[1]) return {name:"course", id:parts[1]};
+    if (parts[0]==="exam" && parts[1]) return {name:"exam", id:parts[1]};
+    if (parts[0]==="sit" && parts[1]) return {name:"sit", id:parts[1]};
+    if (parts[0]==="results") return {name:"results"};
+    if (parts[0]==="map") return {name:"map"};
+    if (parts[0]==="progress") return {name:"progress"};
+    return {name:"hub"};
+  }
+  function go(hash){ location.hash = hash; }
+
+  function key(s,w,c){ return s+"-"+w+"-"+c; }
+  function emptyCell(){ return { topics:"", pages:"", reading:0, confidence:0, notes:"", hours:0, updatedAt:0 }; }
+  function getCell(s,w,c){ return Object.assign(emptyCell(), state.cells[key(s,w,c)]||{}); }
+  function putCell(s,w,c, patch){
+    const cur = getCell(s,w,c);
+    state.cells[key(s,w,c)] = Object.assign({}, cur, patch, { updatedAt: Date.now() });
+    save();
+  }
+  function cur(){ return state.cursor; }
+  function course(id){ return state.courses.find(c => c.id===id); }
+  function examsFor(s,w,c){ return state.exams.filter(e => e.shifting===s && e.week===w && e.courseId===c); }
+
+  function weekStats(s,w){
+    let conf=0, n=0, read=0, notes=0, exams=0;
+    state.courses.forEach(c => {
+      const cell = getCell(s,w,c.id);
+      if (cell.confidence){ conf+=cell.confidence; n++; }
+      read += cell.reading;
+      if ((cell.notes||"").trim()) notes++;
+      exams += examsFor(s,w,c.id).length;
+    });
+    const count = state.courses.length || 1;
+    return { meanConf: n? (conf/n) : 0, read: read/count, notes, exams, logged: n };
+  }
+  function shiftingStats(s){
+    let conf=0, n=0, read=0;
+    for (let w=1;w<=WEEKS;w++){
+      state.courses.forEach(c => {
+        const cell = getCell(s,w,c.id);
+        if (cell.confidence){ conf+=cell.confidence; n++; }
+        read += cell.reading;
+      });
+    }
+    const denom = state.courses.length * WEEKS;
+    return { meanConf: n? conf/n : 0, read: denom? read/denom : 0, logged: n };
+  }
+
+  function markSvg(){
+    return `<svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+      <rect width="32" height="32" rx="7" fill="var(--elevated)"/>
+      <path d="M7 22h18M7 16h12M7 10h18" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>`;
+  }
+  function shell(inner, wide){
+    const r = route();
+    return `<header class="app"><div class="bar">
+      <a class="brand display" href="#/">${markSvg()}Octave</a>
+      <nav class="nav">
+        <a href="#/" class="${r.name==="hub"||r.name==="course"?"on":""}">Week</a>
+        <a href="#/map" class="${r.name==="map"?"on":""}">Map</a>
+        <a href="#/progress" class="${r.name==="progress"?"on":""}">Progress</a>
+        <button class="icon-btn" data-act="theme">${state.theme==="light"?"Dark":"Light"}</button>
+      </nav>
+    </div></header>
+    <main class="${wide?"wide":"narrow"}">${inner}</main>`;
+  }
+
+  function viewSetup(){
+    return shell(`
+      <p class="eyebrow">First sitting</p>
+      <h1 class="hero">Name the seven courses.</h1>
+      <p class="lead">Four shiftings, eight weeks each. These names can be changed later.</p>
+      <form class="stack" style="margin-top:1.2rem" data-act="save-courses">
+        ${state.courses.map((c,i) => `<label class="field">Course ${i+1}
+          <input type="text" data-course="${c.id}" value="${esc(c.name==="Course "+(i+1)?"":c.name)}" placeholder="e.g. Pathology" />
+        </label>`).join("")}
+        <div class="row"><button class="btn" type="submit">Save names</button>
+        <button class="btn ghost" type="button" data-act="skip-setup">Use Course 1–7 for now</button></div>
+      </form>
+    `);
+  }
+
+  function viewHub(){
+    if (!state.named) return viewSetup();
+    const {shifting, week} = cur();
+    const ws = weekStats(shifting, week);
+    return shell(`
+      <p class="eyebrow">Reading log</p>
+      <h1 class="hero">Shifting ${shifting}, week ${week}.</h1>
+      <p class="lead">Seven courses. Log coverage, how far the reading got, a confidence score, notes, then a short exam if I wrote one.</p>
+      <div class="row shiftbar" style="margin-top:1rem">
+        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
+      </div>
+      <p class="section">Week</p>
+      <div class="weekbar">
+        ${Array.from({length:WEEKS},(_,i)=>i+1).map(w => `<button type="button" class="${week===w?"on":""}" data-act="set-week" data-w="${w}">${w}</button>`).join("")}
+      </div>
+      <div class="grid-3" style="margin-top:1rem">
+        <div class="stat"><p class="k">Mean confidence</p><p class="v">${ws.logged? ws.meanConf.toFixed(1)+" / 5":"—"}</p><p class="small subtle" style="margin:.15rem 0 0">${ws.logged} of ${state.courses.length} logged</p></div>
+        <div class="stat"><p class="k">Reading</p><p class="v">${Math.round(ws.read)}%</p><p class="small subtle" style="margin:.15rem 0 0">average across courses</p></div>
+        <div class="stat"><p class="k">This week</p><p class="v">${ws.notes} notes</p><p class="small subtle" style="margin:.15rem 0 0">${ws.exams} practice exam${ws.exams===1?"":"s"}</p></div>
+      </div>
+      <p class="section">Courses</p>
+      <div class="grid-7">
+        ${state.courses.map(c => {
+          const cell = getCell(shifting, week, c.id);
+          const nEx = examsFor(shifting, week, c.id).length;
+          return `<a class="card" href="#/c/${c.id}" style="min-height:9.5rem;display:flex;flex-direction:column">
+            <p class="mono eyebrow">${esc(c.code)}</p>
+            <h2 style="font-size:1.05rem;margin:.3rem 0 .4rem">${esc(c.name)}</h2>
+            <p class="small muted" style="flex:1;margin:0">${esc((cell.topics||"").trim() || "No coverage logged")}</p>
+            <div class="bar-read" style="margin:.55rem 0 .35rem"><span style="width:${cell.reading}%"></span></div>
+            <p class="small subtle" style="margin:0">${cell.confidence?CONF[cell.confidence]: "No confidence"} · ${cell.reading}%${nEx?` · ${nEx} exam`:""}${(cell.notes||"").trim()?" · notes":""}</p>
+          </a>`;
+        }).join("")}
+      </div>
+      <p class="small subtle" style="margin-top:1.4rem">Progress keeps the 8-week map for this shifting. Everything stays in this browser.</p>
+    `, true);
+  }
+
+  function viewCourse(id){
+    const c = course(id);
+    if (!c) return shell(`<p class="muted">That course isn’t here.</p><p><a class="btn" href="#/">Week</a></p>`);
+    const {shifting, week} = cur();
+    const cell = getCell(shifting, week, id);
+    const exams = examsFor(shifting, week, id);
+    return shell(`
+      <a class="small muted" href="#/">← Shifting ${shifting} · Week ${week}</a>
+      <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.7rem">
+        <div>
+          <p class="eyebrow">${esc(c.code)}</p>
+          <h1 class="hero">${esc(c.name)}</h1>
+          <p class="lead">Week ${week} of shifting ${shifting}.</p>
+        </div>
+        <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Rename</button>
+      </div>
+      <div class="grid-2" style="margin-top:1.1rem">
+        <div class="card stack">
+          <p class="eyebrow">This week’s coverage</p>
+          <label class="field">Topics
+            <textarea id="topics" style="min-height:5rem" placeholder="What was introduced this week">${esc(cell.topics)}</textarea>
+          </label>
+          <label class="field">Chapter / pages
+            <input id="pages" type="text" value="${esc(cell.pages)}" placeholder="e.g. Robbins ch. 3, pp. 80–112" />
+          </label>
+          <label class="field">Reading ${cell.reading}%
+            <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
+          </label>
+          <label class="field">Hours on this
+            <input id="hours" type="number" min="0" max="80" step="0.5" value="${cell.hours||0}" />
+          </label>
+        </div>
+        <div class="card stack">
+          <p class="eyebrow">Self-reported confidence</p>
+          <p class="small muted" style="margin:0">How this week of this course sits, today. One score. Change it when it moves.</p>
+          <div class="conf">
+            ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
+          </div>
+          <p class="small subtle" style="margin:0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
+          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this week</button>
+        </div>
+      </div>
+      <p class="section">Revision notes</p>
+      <div class="card">
+        <textarea id="notes" class="notes" placeholder="High-yield only. What I would want the night before the exam.">${esc(cell.notes)}</textarea>
+        <p class="small subtle" style="margin:.5rem 0 0">Saved with the week. Autosaves as I type.</p>
+      </div>
+      <p class="section">Practice exams</p>
+      <div class="row" style="margin-bottom:.6rem">
+        <button class="btn" type="button" data-act="new-exam" data-id="${id}">New exam for this week</button>
+      </div>
+      ${exams.length===0?`<p class="small muted">None yet. Write a short set from this week’s coverage, then sit it.</p>`:
+        exams.map(e => `<div class="card row" style="justify-content:space-between;margin-bottom:.5rem">
+          <div><p class="display" style="margin:0;font-size:1.05rem">${esc(e.title)}</p>
+          <p class="small muted" style="margin:.15rem 0 0">${e.questions.length} item${e.questions.length===1?"":"s"}</p></div>
+          <div class="row">
+            <a class="btn sm" href="#/exam/${e.id}">Edit</a>
+            <a class="btn sm sec" href="#/sit/${e.id}">Sit</a>
+          </div>
+        </div>`).join("")}
+    `, true);
+  }
+
+  function viewExam(id){
+    const exam = state.exams.find(e => e.id===id);
+    if (!exam) return shell(`<p class="muted">That exam isn’t here.</p><p><a class="btn" href="#/">Week</a></p>`);
+    const c = course(exam.courseId);
+    return shell(`
+      <a class="small muted" href="#/c/${exam.courseId}">← ${esc(c?c.name:"Course")} · W${exam.week}</a>
+      <h1 class="hero" style="margin-top:.7rem">${esc(exam.title)}</h1>
+      <p class="lead">Shifting ${exam.shifting} · week ${exam.week}. Add items, then sit.</p>
+      <label class="field" style="margin-top:1rem">Title
+        <input id="exam-title" type="text" value="${esc(exam.title)}" />
+      </label>
+      <div class="stack" style="margin-top:1rem">
+        ${exam.questions.map((q,i) => `<div class="card">
+          <p class="small mono subtle" style="margin:0">${i+1}</p>
+          <p class="stem" style="font-size:1.05rem">${esc(q.stem)}</p>
+          <p class="small muted">Answer ${LETTERS[q.correctIndex]}. ${esc(q.rationale||"")}</p>
+          <button class="btn ghost sm" type="button" data-act="del-q" data-id="${exam.id}" data-i="${i}">Remove</button>
+        </div>`).join("")}
+      </div>
+      <div class="card stack" style="margin-top:1rem">
+        <p class="eyebrow">Add an item</p>
+        <label class="field">Stem<textarea id="q-stem" style="min-height:4.5rem"></textarea></label>
+        <label class="field">A<input id="q-a" type="text" /></label>
+        <label class="field">B<input id="q-b" type="text" /></label>
+        <label class="field">C<input id="q-c" type="text" /></label>
+        <label class="field">D<input id="q-d" type="text" /></label>
+        <label class="field">Correct
+          <select id="q-key"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+        </label>
+        <label class="field">Rationale<textarea id="q-rat" style="min-height:4rem"></textarea></label>
+        <div class="row">
+          <button class="btn" type="button" data-act="add-q" data-id="${exam.id}">Add item</button>
+          <button class="btn sec" type="button" data-act="save-exam-title" data-id="${exam.id}">Save title</button>
+          ${exam.questions.length?`<a class="btn ghost" href="#/sit/${exam.id}">Sit ${exam.questions.length}</a>`:""}
+          <button class="btn warn sm" type="button" data-act="delete-exam" data-id="${exam.id}">Delete exam</button>
+        </div>
+      </div>
+    `);
+  }
+
+  function viewSit(id){
+    const ses = state.session;
+    if (!ses || ses.examId!==id) {
+      const exam = state.exams.find(e => e.id===id);
+      if (!exam || !exam.questions.length) return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/">Week</a></p>`);
+      startSit(exam);
+    }
+    const s = state.session;
+    const exam = state.exams.find(e => e.id===s.examId);
+    const q = exam.questions[s.index];
+    const chosen = s.answers[s.index];
+    const locked = chosen!==null && chosen!==undefined;
+    const isLast = s.index===exam.questions.length-1;
+    return shell(`
+      <p class="eyebrow">${esc(exam.title)}</p>
+      <p class="small muted">Item ${s.index+1} of ${exam.questions.length}</p>
+      <h1 class="stem">${esc(q.stem)}</h1>
+      <div class="stack" style="margin-top:1rem">
+        ${q.options.map((opt,i) => {
+          let cls="opt";
+          if (locked && i===q.correctIndex) cls+=" ok";
+          else if (locked && chosen===i && i!==q.correctIndex) cls+=" bad";
+          return `<button class="${cls}" data-act="answer" data-i="${i}" ${locked?"disabled":""}><span class="ltr">${LETTERS[i]}</span><span>${esc(opt)}</span></button>`;
+        }).join("")}
+      </div>
+      ${locked?`<div class="rationale" style="margin-top:1rem">
+        <p class="small" style="margin:0;color:${chosen===q.correctIndex?"var(--correct)":"var(--wrong)"}">${chosen===q.correctIndex?"That’s it.":"Not this one."} Answer ${LETTERS[q.correctIndex]}.</p>
+        <p class="small" style="margin:.4rem 0 0">${esc(q.rationale||"")}</p>
+      </div>`:""}
+      <div class="row" style="margin-top:1.1rem;justify-content:space-between">
+        <button class="btn sec" type="button" data-act="prev-q" ${s.index===0?"disabled":""}>Previous</button>
+        ${isLast?`<button class="btn" type="button" data-act="finish-sit" ${locked?"":"disabled"}>See score</button>`:
+          `<button class="btn" type="button" data-act="next-q" ${locked?"":"disabled"}>Next</button>`}
+      </div>
+    `);
+  }
+
+  function viewResults(){
+    const ses = state.session;
+    if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/">Week</a></p>`);
+    const exam = state.exams.find(e => e.id===ses.examId);
+    const total = exam.questions.length;
+    let correct=0;
+    ses.answers.forEach((a,i) => { if (a===exam.questions[i].correctIndex) correct++; });
+    return shell(`
+      <p class="eyebrow">This set</p>
+      <h1 class="hero">${pct(correct,total)}%</h1>
+      <p class="lead">${esc(exam.title)} · ${correct} of ${total}</p>
+      <div class="row" style="margin:1rem 0">
+        <a class="btn" href="#/c/${exam.courseId}">Back to the week</a>
+        <a class="btn sec" href="#/sit/${exam.id}">Sit it again</a>
+      </div>
+      <div class="card" style="overflow:auto">
+        <table>
+          <thead><tr><th>#</th><th>Stem</th><th>Yours</th><th>Key</th></tr></thead>
+          <tbody>${exam.questions.map((q,i) => {
+            const a = ses.answers[i];
+            const ok = a===q.correctIndex;
+            return `<tr>
+              <td class="mono">${i+1}</td>
+              <td>${esc(q.stem.slice(0,90))}</td>
+              <td style="color:${ok?"var(--correct)":"var(--wrong)"}">${a==null?"—":LETTERS[a]}</td>
+              <td>${LETTERS[q.correctIndex]}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+    `);
+  }
+
+  function viewMap(){
+    const {shifting, week} = cur();
+    return shell(`
+      <p class="eyebrow">Eight-week map</p>
+      <h1 class="hero">Shifting ${shifting}.</h1>
+      <p class="lead">Each cell is a course-week. Colour is the confidence I logged. Tap to open that week.</p>
+      <div class="row shiftbar" style="margin-top:1rem">
+        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
+      </div>
+      <div class="card" style="margin-top:1rem;overflow:auto">
+        <div class="heat" style="margin-bottom:.4rem">
+          <div></div>
+          ${Array.from({length:WEEKS},(_,i)=>`<div class="small subtle" style="text-align:center">W${i+1}</div>`).join("")}
+        </div>
+        ${state.courses.map(c => `<div class="heat" style="margin-bottom:.28rem">
+          <div class="lab" title="${esc(c.name)}">${esc(c.code)}</div>
+          ${Array.from({length:WEEKS},(_,i) => {
+            const w=i+1;
+            const cell = getCell(shifting,w,c.id);
+            const on = week===w;
+            return `<button class="cell c${cell.confidence||0} ${on?"on":""}" data-act="open-cell" data-id="${c.id}" data-w="${w}" title="${esc(c.name)} W${w}: ${CONF[cell.confidence]}"></button>`;
+          }).join("")}
+        </div>`).join("")}
+        <p class="small subtle" style="margin:.8rem 0 0">Lost · Recognize · With notes · Cold · Exam-ready</p>
+      </div>
+    `, true);
+  }
+
+  function viewProgress(){
+    const {shifting} = cur();
+    const sh = shiftingStats(shifting);
+    const means = Array.from({length:WEEKS},(_,i) => weekStats(shifting, i+1));
+    const last = state.attempts.slice(0,8);
+    const weak = state.courses.map(c => {
+      const cell = getCell(shifting, cur().week, c.id);
+      return { c, cell };
+    }).filter(x => x.cell.confidence && x.cell.confidence<=2);
+    return shell(`
+      <p class="eyebrow">Progress</p>
+      <h1 class="hero">Shifting ${shifting} so far.</h1>
+      <p class="lead">Weekly confidence is self-reported. It only moves if I log it.</p>
+      <div class="row shiftbar" style="margin-top:1rem">
+        ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
+      </div>
+      <div class="grid-3" style="margin-top:1rem">
+        <div class="stat"><p class="k">Mean confidence</p><p class="v">${sh.logged? sh.meanConf.toFixed(1):"—"}</p></div>
+        <div class="stat"><p class="k">Reading</p><p class="v">${Math.round(sh.read)}%</p></div>
+        <div class="stat"><p class="k">Exams sat</p><p class="v">${state.attempts.filter(a=>a.shifting===shifting).length}</p></div>
+      </div>
+      <p class="section">Weekly mean confidence</p>
+      <div class="card">
+        <div class="weekmean">
+          ${means.map((m,i) => {
+            const h = m.meanConf ? (m.meanConf/5)*100 : 4;
+            return `<div class="col"><div class="fill" style="height:${h}%"></div><span class="small subtle" style="text-align:center">W${i+1}</span></div>`;
+          }).join("")}
+        </div>
+      </div>
+      ${weak.length?`<p class="section">Still thin this week</p>
+        <div class="stack">${weak.map(x => `<a class="card" href="#/c/${x.c.id}"><strong>${esc(x.c.name)}</strong> · ${CONF[x.cell.confidence]}</a>`).join("")}</div>`:""}
+      <p class="section">Exams sat</p>
+      ${last.length===0?`<p class="small muted">None yet.</p>`:`<div class="card" style="overflow:auto"><table>
+        <thead><tr><th>When</th><th>Set</th><th>Score</th></tr></thead>
+        <tbody>${last.map(a => `<tr>
+          <td class="small">${new Date(a.at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</td>
+          <td>${esc(a.title)}</td>
+          <td class="mono">${a.correct}/${a.total} · ${pct(a.correct,a.total)}%</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`}
+      <p class="section">This device</p>
+      <div class="card">
+        <p class="small muted" style="margin-top:0">Laptop and iPad do not share this log. Save a transfer file, then restore on the other device.</p>
+        <div class="row">
+          <button class="btn" type="button" data-act="export">Save transfer file</button>
+          <label class="btn sec">Restore<input id="restore" type="file" accept="application/json,.json" hidden /></label>
+          <a class="btn ghost" href="#/setup">Rename courses</a>
+        </div>
+      </div>
+    `, true);
+  }
+
+  function startSit(exam){
+    const order = exam.questions.map((_,i)=>i);
+    for (let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    const questions = order.map(i => exam.questions[i]);
+    state.session = {
+      examId: exam.id, title: exam.title, courseId: exam.courseId,
+      shifting: exam.shifting, week: exam.week,
+      questions, answers: questions.map(()=>null), index: 0, startedAt: Date.now(), finishedAt: null
+    };
+    // sit uses exam.questions in order of session - we'll snapshot onto session
+    exam._sitSnap = questions;
+    save();
+  }
+  // Fix sit to use snapshot on session instead of mutating exam
+  function startSit2(exam){
+    const questions = exam.questions.map(q => Object.assign({}, q, { options: q.options.slice() }));
+    for (let i=questions.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [questions[i],questions[j]]=[questions[j],questions[i]]; }
+    state.session = {
+      examId: exam.id, title: exam.title, courseId: exam.courseId,
+      shifting: exam.shifting, week: exam.week,
+      questions, answers: questions.map(()=>null), index: 0, startedAt: Date.now(), finishedAt: null
+    };
+    save();
+  }
+
+  function closeModal(){ document.getElementById("modal").innerHTML = ""; }
+  function openModal(html){
+    const root = document.getElementById("modal");
+    root.innerHTML = `<div class="overlay" id="overlay"><div class="modal" role="dialog">${html}</div></div>`;
+    const overlay = document.getElementById("overlay");
+    overlay.addEventListener("click", (e) => { if (e.target===overlay) closeModal(); });
+    overlay.querySelector(".modal").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const t = e.target.closest("[data-act]");
+      if (t) handleAct(t, e);
+    });
+    const first = overlay.querySelector("input, textarea");
+    if (first) setTimeout(() => first.focus(), 40);
+  }
+
+  function bind(){
+    const app = document.getElementById("app");
+    app.onclick = (e) => {
+      const t = e.target.closest("[data-act]");
+      if (t) handleAct(t, e);
+    };
+    app.onsubmit = (e) => {
+      const form = e.target.closest("form");
+      if (!form) return;
+      e.preventDefault();
+      if (form.getAttribute("data-act")==="save-courses"){
+        const inputs = [...form.querySelectorAll("[data-course]")];
+        inputs.forEach((inp,i) => {
+          const name = (inp.value||"").trim() || ("Course "+(i+1));
+          const c = state.courses.find(x => x.id===inp.getAttribute("data-course"));
+          if (c){ c.name = name; c.code = name.slice(0,6).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5) || c.code; }
+        });
+        state.named = true; save(); toast("Courses named."); go("#/");
+      }
+    };
+    ["topics","pages","reading","hours","notes"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const r = route();
+      if (r.name!=="course") return;
+      const fire = () => {
+        const patch = {
+          topics: (document.getElementById("topics")||{}).value,
+          pages: (document.getElementById("pages")||{}).value,
+          reading: Number((document.getElementById("reading")||{}).value||0),
+          hours: Number((document.getElementById("hours")||{}).value||0),
+          notes: (document.getElementById("notes")||{}).value
+        };
+        putCell(cur().shifting, cur().week, r.id, patch);
+        if (id==="reading"){
+          const lab = el.closest(".field");
+          if (lab) lab.childNodes[0].textContent = "Reading "+patch.reading+"%";
+        }
+      };
+      el.addEventListener(id==="notes"||id==="topics"?"input":"change", fire);
+    });
+    const restore = document.getElementById("restore");
+    if (restore) restore.onchange = () => {
+      const f = restore.files && restore.files[0]; restore.value="";
+      if (!f) return;
+      f.text().then(text => {
+        const dump = JSON.parse(text);
+        if (!dump.courses || !dump.cells) throw new Error("bad");
+        if (!confirm("Replace this log with the transfer file?")) return;
+        state = Object.assign(defaultState(), dump);
+        document.documentElement.classList.toggle("light", state.theme==="light");
+        save(); toast("This device now matches the other one."); go("#/");
+      }).catch(() => toast("That isn’t an Octave transfer file."));
+    };
+    window.onkeydown = (e) => {
+      if (e.key==="Escape" && document.querySelector(".overlay")) closeModal();
+    };
+  }
+
+  function handleAct(t){
+    const act = t.dataset.act;
+    if (act==="theme"){
+      state.theme = state.theme==="light"?"dark":"light";
+      document.documentElement.classList.toggle("light", state.theme==="light");
+      save(); render(); return;
+    }
+    if (act==="skip-setup"){ state.named = true; save(); go("#/"); return; }
+    if (act==="set-shift"){
+      state.cursor.shifting = Number(t.dataset.s); save(); render(); return;
+    }
+    if (act==="set-week"){
+      state.cursor.week = Number(t.dataset.w); save(); render(); return;
+    }
+    if (act==="open-cell"){
+      state.cursor.week = Number(t.dataset.w); save(); go("#/c/"+t.dataset.id); return;
+    }
+    if (act==="conf"){
+      const r = route();
+      putCell(cur().shifting, cur().week, r.id, { confidence: Number(t.dataset.n) });
+      render(); return;
+    }
+    if (act==="save-cell"){
+      const id = t.dataset.id;
+      putCell(cur().shifting, cur().week, id, {
+        topics: (document.getElementById("topics")||{}).value,
+        pages: (document.getElementById("pages")||{}).value,
+        reading: Number((document.getElementById("reading")||{}).value||0),
+        hours: Number((document.getElementById("hours")||{}).value||0),
+        notes: (document.getElementById("notes")||{}).value
+      });
+      toast("Week saved."); render(); return;
+    }
+    if (act==="rename-course"){
+      const c = course(t.dataset.id);
+      openModal(`<p class="eyebrow">Rename</p>
+        <h3 style="margin:.3rem 0 1rem">${esc(c.name)}</h3>
+        <label class="field">Name<input id="rn-name" type="text" value="${esc(c.name)}" /></label>
+        <label class="field">Code<input id="rn-code" type="text" maxlength="8" value="${esc(c.code)}" /></label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="do-rename" data-id="${c.id}">Save</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-rename"){
+      const c = course(t.dataset.id);
+      const name = ((document.getElementById("rn-name")||{}).value||"").trim();
+      const code = ((document.getElementById("rn-code")||{}).value||"").trim().toUpperCase();
+      if (!name){ toast("Need a name."); return; }
+      c.name = name; c.code = code || c.code; save(); closeModal(); toast("Renamed."); render(); return;
+    }
+    if (act==="close-modal"){ closeModal(); return; }
+    if (act==="new-exam"){
+      openModal(`<p class="eyebrow">New exam</p>
+        <h3 style="margin:.3rem 0 1rem">For this week</h3>
+        <label class="field">Title<input id="ex-title" type="text" placeholder="e.g. Week 3 coverage, 10 items" /></label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="create-exam" data-id="${t.dataset.id}">Create</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="create-exam"){
+      const title = ((document.getElementById("ex-title")||{}).value||"").trim() || ("Week "+cur().week+" · "+(course(t.dataset.id)||{}).code);
+      const exam = {
+        id: uid("ex"), courseId: t.dataset.id, shifting: cur().shifting, week: cur().week,
+        title, questions: [], createdAt: Date.now()
+      };
+      state.exams.push(exam); save(); closeModal(); go("#/exam/"+exam.id); return;
+    }
+    if (act==="save-exam-title"){
+      const exam = state.exams.find(e => e.id===t.dataset.id);
+      exam.title = ((document.getElementById("exam-title")||{}).value||"").trim() || exam.title;
+      save(); toast("Title saved."); return;
+    }
+    if (act==="add-q"){
+      const exam = state.exams.find(e => e.id===t.dataset.id);
+      const stem = ((document.getElementById("q-stem")||{}).value||"").trim();
+      const opts = ["q-a","q-b","q-c","q-d"].map(id => ((document.getElementById(id)||{}).value||"").trim()).filter(Boolean);
+      const key = ((document.getElementById("q-key")||{}).value||"A");
+      const rationale = ((document.getElementById("q-rat")||{}).value||"").trim();
+      if (!stem || opts.length<2){ toast("Need a stem and at least two options."); return; }
+      const ci = key.charCodeAt(0)-65;
+      if (ci<0 || ci>=opts.length){ toast("Correct option is empty."); return; }
+      exam.questions.push({ stem, options: opts, correctIndex: ci, rationale });
+      save(); toast("Item added."); render(); return;
+    }
+    if (act==="del-q"){
+      const exam = state.exams.find(e => e.id===t.dataset.id);
+      exam.questions.splice(Number(t.dataset.i),1); save(); render(); return;
+    }
+    if (act==="delete-exam"){
+      if (!confirm("Delete this exam?")) return;
+      const exam = state.exams.find(e => e.id===t.dataset.id);
+      state.exams = state.exams.filter(e => e.id!==t.dataset.id);
+      save(); toast("Exam gone."); go("#/c/"+(exam?exam.courseId:"")); return;
+    }
+    if (act==="answer"){
+      const ses = state.session; if (!ses || ses.answers[ses.index]!=null) return;
+      ses.answers[ses.index] = Number(t.dataset.i); save(); render(); return;
+    }
+    if (act==="next-q"){ const ses=state.session; if (ses.index<ses.questions.length-1){ ses.index++; save(); render(); } return; }
+    if (act==="prev-q"){ const ses=state.session; if (ses.index>0){ ses.index--; save(); render(); } return; }
+    if (act==="finish-sit"){
+      const ses = state.session;
+      const exam = { questions: ses.questions };
+      ses.finishedAt = Date.now();
+      let correct=0;
+      ses.answers.forEach((a,i) => { if (a===ses.questions[i].correctIndex) correct++; });
+      state.attempts.unshift({
+        id: uid("att"), at: ses.finishedAt, title: ses.title, examId: ses.examId,
+        courseId: ses.courseId, shifting: ses.shifting, week: ses.week,
+        correct, total: ses.questions.length
+      });
+      save(); go("#/results"); return;
+    }
+    if (act==="export"){
+      const stamp = new Date().toISOString().slice(0,10);
+      const blob = new Blob([JSON.stringify({kind:"octave-transfer", version:1, exportedAt:Date.now(), ...state})], {type:"application/json"});
+      const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="octave-transfer-"+stamp+".json"; a.click();
+      toast("Transfer file saved."); return;
+    }
+  }
+
+  function render(){
+    const r = route();
+    let html = "";
+    if (r.name==="setup") html = viewSetup();
+    else if (r.name==="hub") html = viewHub();
+    else if (r.name==="course") html = viewCourse(r.id);
+    else if (r.name==="exam") html = viewExam(r.id);
+    else if (r.name==="sit") html = viewSit(r.id);
+    else if (r.name==="results") html = viewResults();
+    else if (r.name==="map") html = viewMap();
+    else if (r.name==="progress") html = viewProgress();
+    else html = viewHub();
+    document.getElementById("app").innerHTML = html;
+    bind();
+  }
+
+  // Use shuffled snapshot on session for sitting
+  const _viewSit = viewSit;
+  viewSit = function(id){
+    const exam = state.exams.find(e => e.id===id);
+    if (!exam || !exam.questions.length) return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/">Week</a></p>`);
+    if (!state.session || state.session.examId!==id || state.session.finishedAt){
+      startSit2(exam);
+    }
+    const s = state.session;
+    const q = s.questions[s.index];
+    const chosen = s.answers[s.index];
+    const locked = chosen!==null && chosen!==undefined;
+    const isLast = s.index===s.questions.length-1;
+    return shell(`
+      <p class="eyebrow">${esc(s.title)}</p>
+      <p class="small muted">Item ${s.index+1} of ${s.questions.length} · shuffled</p>
+      <h1 class="stem">${esc(q.stem)}</h1>
+      <div class="stack" style="margin-top:1rem">
+        ${q.options.map((opt,i) => {
+          let cls="opt";
+          if (locked && i===q.correctIndex) cls+=" ok";
+          else if (locked && chosen===i && i!==q.correctIndex) cls+=" bad";
+          return `<button class="${cls}" data-act="answer" data-i="${i}" ${locked?"disabled":""}><span class="ltr">${LETTERS[i]}</span><span>${esc(opt)}</span></button>`;
+        }).join("")}
+      </div>
+      ${locked?`<div class="rationale" style="margin-top:1rem">
+        <p class="small" style="margin:0;color:${chosen===q.correctIndex?"var(--correct)":"var(--wrong)"}">${chosen===q.correctIndex?"That’s it.":"Not this one."} Answer ${LETTERS[q.correctIndex]}.</p>
+        <p class="small" style="margin:.4rem 0 0">${esc(q.rationale||"")}</p>
+      </div>`:""}
+      <div class="row" style="margin-top:1.1rem;justify-content:space-between">
+        <button class="btn sec" type="button" data-act="prev-q" ${s.index===0?"disabled":""}>Previous</button>
+        ${isLast?`<button class="btn" type="button" data-act="finish-sit" ${locked?"":"disabled"}>See score</button>`:
+          `<button class="btn" type="button" data-act="next-q" ${locked?"":"disabled"}>Next</button>`}
+      </div>
+    `);
+  };
+  viewResults = function(){
+    const ses = state.session;
+    if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/">Week</a></p>`);
+    const total = ses.questions.length;
+    let correct=0;
+    ses.answers.forEach((a,i) => { if (a===ses.questions[i].correctIndex) correct++; });
+    return shell(`
+      <p class="eyebrow">This set</p>
+      <h1 class="hero">${pct(correct,total)}%</h1>
+      <p class="lead">${esc(ses.title)} · ${correct} of ${total}</p>
+      <div class="row" style="margin:1rem 0">
+        <a class="btn" href="#/c/${ses.courseId}">Back to the week</a>
+        <a class="btn sec" href="#/sit/${ses.examId}">Sit it again</a>
+      </div>
+      <div class="card" style="overflow:auto">
+        <table>
+          <thead><tr><th>#</th><th>Stem</th><th>Yours</th><th>Key</th></tr></thead>
+          <tbody>${ses.questions.map((q,i) => {
+            const a = ses.answers[i];
+            const ok = a===q.correctIndex;
+            return `<tr>
+              <td class="mono">${i+1}</td>
+              <td>${esc(q.stem.slice(0,90))}</td>
+              <td style="color:${ok?"var(--correct)":"var(--wrong)"}">${a==null?"—":LETTERS[a]}</td>
+              <td>${LETTERS[q.correctIndex]}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+    `);
+  };
+
+  window.addEventListener("hashchange", render);
+  render();
+})();
+  </script>
+</body>
+</html>
