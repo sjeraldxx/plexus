@@ -370,7 +370,7 @@
     if (parts[0]==="c" && parts[1]) return {name:"course", id:parts[1]};
     if (parts[0]==="exam" && parts[1]) return {name:"exam", id:parts[1]};
     if (parts[0]==="sit" && parts[1]) return {name:"sit", id:parts[1]};
-    if (parts[0]==="practice") return {name:"practice"};
+    if (parts[0]==="practice") return {name:"practice", id: parts[1] || ""};
     if (parts[0]==="results") return {name:"results"};
     if (parts[0]==="map") return {name:"map"};
     if (parts[0]==="progress") return {name:"progress"};
@@ -1396,49 +1396,61 @@
     const {shifting} = cur();
     const year = isYear();
     const weeks = slotWeeks(shifting);
+    const r = route();
+    const picked = r.id ? course(r.id) : null;
     const resume = state.session && !state.session.finishedAt && state.session.questions && state.session.questions.length;
-    return shell(`
-      <p class="eyebrow">Practice</p>
-      <h1 class="hero">${year ? "Year compre." : "Shifting "+shifting+"."}</h1>
-      <p class="lead">Pick the shifting, then the course, then the week — sit that set without opening the log.</p>
-      ${shiftBar()}
-      ${resume?`<div class="card row" style="justify-content:space-between;margin-top:1rem">
+    const resumeCard = resume?`<div class="card row" style="justify-content:space-between;margin-top:1rem">
         <div>
           <p class="small muted" style="margin:0">Unfinished</p>
           <p class="display" style="margin:.15rem 0 0;font-size:1.05rem">${esc(state.session.title)}</p>
           <p class="small subtle" style="margin:.15rem 0 0">Item ${state.session.index+1} of ${state.session.questions.length}</p>
         </div>
         <a class="btn" href="#/sit/${esc(state.session.examId)}">Resume</a>
-      </div>`:""}
-      <div class="stack" style="margin-top:1.1rem">
-        ${state.courses.length===0?`<p class="small muted">Add a course on Week first.</p>`: state.courses.map(c => {
-          const total = state.exams.filter(e => e.courseId===c.id && e.shifting===shifting && (e.questions||[]).length).reduce((n,e)=>n+e.questions.length,0);
-          return `<div class="card">
-            <div class="row" style="justify-content:space-between;align-items:flex-end">
+      </div>`:"";
+    if (picked){
+      const total = state.exams.filter(e => e.courseId===picked.id && e.shifting===shifting && (e.questions||[]).length).reduce((n,e)=>n+e.questions.length,0);
+      return shell(`
+        <a class="small muted" href="#/practice">← Courses</a>
+        <p class="eyebrow" style="margin-top:.7rem">${esc(picked.code)}</p>
+        <h1 class="hero">${esc(displayName(picked))}</h1>
+        <p class="lead">${year ? "Year compre." : "Shifting "+shifting+". "} ${total? total+" item"+(total===1?"":"s")+" in this block.":"No set imported yet."}</p>
+        ${shiftBar()}
+        ${resumeCard}
+        <div class="card" style="margin-top:1rem">
+          ${weeks.map(w => {
+            const sets = examsFor(shifting, w, picked.id).filter(e => (e.questions||[]).length);
+            const n = sets.reduce((x,e)=>x+e.questions.length,0);
+            return `<div class="sit-row">
               <div>
-                <p class="mono eyebrow" style="margin:0">${esc(c.code)}</p>
-                <h2 style="margin:.2rem 0 0;font-size:1.2rem">${esc(displayName(c))}</h2>
+                <p style="margin:0;font-weight:600">${esc(weekLabel(w, shifting))}</p>
+                <p class="small muted" style="margin:.1rem 0 0">${n? n+" item"+(n===1?"":"s")+(sets.length>1?" · "+sets.length+" sets":""):"No set imported"}</p>
               </div>
-              <p class="small subtle" style="margin:0">${total? total+" item"+(total===1?"":"s"):"No items yet"}</p>
-            </div>
-            <div style="margin-top:.7rem">
-              ${weeks.map(w => {
-                const sets = examsFor(shifting, w, c.id).filter(e => (e.questions||[]).length);
-                const n = sets.reduce((x,e)=>x+e.questions.length,0);
-                const label = weekLabel(w, shifting);
-                return `<div class="sit-row">
-                  <div>
-                    <p style="margin:0;font-weight:600">${esc(label)}</p>
-                    <p class="small muted" style="margin:.1rem 0 0">${n? n+" item"+(n===1?"":"s")+(sets.length>1?" · "+sets.length+" sets":""):"No set imported"}</p>
-                  </div>
-                  <button class="btn sm" type="button" data-act="sit-week" data-id="${c.id}" data-s="${shifting}" data-w="${w}" ${n?"":"disabled"}>Sit</button>
-                </div>`;
-              }).join("")}
-            </div>
-          </div>`;
+              <button class="btn sm" type="button" data-act="sit-week" data-id="${picked.id}" data-s="${shifting}" data-w="${w}" ${n?"":"disabled"}>Sit</button>
+            </div>`;
+          }).join("")}
+        </div>
+        <p class="small subtle" style="margin-top:1.2rem">Import a CSV on the week if a row has no set. Items shuffle each sitting.</p>
+      `, true);
+    }
+    return shell(`
+      <p class="eyebrow">Practice</p>
+      <h1 class="hero">${year ? "Year compre." : "Shifting "+shifting+"."}</h1>
+      <p class="lead">Pick the course. Weeks open after that.</p>
+      ${shiftBar()}
+      ${resumeCard}
+      <p class="section">${state.courses.length} course${state.courses.length===1?"":"s"}</p>
+      ${state.courses.length===0?`<p class="small muted">Add a course on Week first.</p>`:""}
+      <div class="grid-7">
+        ${state.courses.map(c => {
+          const total = state.exams.filter(e => e.courseId===c.id && e.shifting===shifting && (e.questions||[]).length).reduce((n,e)=>n+e.questions.length,0);
+          return `<a class="card course-row" href="#/practice/${c.id}">
+            <p class="mono eyebrow code">${esc(c.code)}</p>
+            <h2>${esc(displayName(c))}</h2>
+            <p class="small muted meta">${total? total+" item"+(total===1?"":"s")+" ready":"No set in this shifting yet"}</p>
+            <p class="small subtle side">${year?"Compre":"Weeks 1–8, then long exam"}</p>
+          </a>`;
         }).join("")}
       </div>
-      <p class="small subtle" style="margin-top:1.2rem">Import a CSV on the week if a row says no set. Items shuffle each sitting.</p>
     `, true);
   }
   function startSit2(exam){
