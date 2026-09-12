@@ -745,6 +745,7 @@
         </div>
         <div class="row">
           <button class="btn sec" data-act="add-q" data-id="${course.id}">Add a question</button>
+          <button class="btn ghost" data-act="rename-course" data-id="${course.id}">Edit title</button>
           <button class="btn ghost" data-act="export-csv" data-id="${course.id}">Export CSV</button>
           <button class="btn ghost" data-act="delete-course" data-id="${course.id}">Delete</button>
         </div>
@@ -1356,6 +1357,40 @@
       }
       state.questions.push({id:uid("q"), courseId:t.dataset.id, quarter, week, coverage, stem, options:opts, correctIndex, rationale, createdAt:Date.now(), sample:false});
       save(); closeModal(); toast("Saved."); render(); return;
+    }
+    if (act==="rename-course"){
+      const c = state.courses.find(x => x.id===t.dataset.id);
+      if (!c) return;
+      openModal(`<p class="eyebrow" style="margin:0">Edit course</p>
+        <h3 style="margin:.3rem 0 1rem">${esc(c.name)}</h3>
+        <form data-act="do-rename" data-id="${c.id}" class="stack">
+          <label class="field">Title<input id="rn-name" type="text" value="${esc(c.name)}" autocomplete="off" /></label>
+          <label class="field">Code<input id="rn-code" type="text" maxlength="8" value="${esc(c.code)}" autocomplete="off" /></label>
+          <label class="field">Blurb<textarea id="rn-blurb">${esc(c.blurb||"")}</textarea></label>
+          <p id="modal-err" class="err" hidden></p>
+          <div class="row" style="margin-top:.3rem">
+            <button class="btn" type="button" data-act="do-rename" data-id="${c.id}">Save title</button>
+            <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+          </div>
+        </form>`);
+      return;
+    }
+    if (act==="do-rename"){
+      const c = state.courses.find(x => x.id===t.dataset.id);
+      if (!c) return;
+      const name = ((document.getElementById("rn-name")||{}).value||"").trim();
+      const code = ((document.getElementById("rn-code")||{}).value||"").trim().toUpperCase();
+      const blurb = ((document.getElementById("rn-blurb")||{}).value||"").trim();
+      if (!name){
+        const err = document.getElementById("modal-err");
+        if (err){ err.hidden = false; err.textContent = "Need a title."; }
+        else toast("Need a title.");
+        return;
+      }
+      c.name = name;
+      c.code = code || c.code;
+      if (blurb) c.blurb = blurb;
+      save(); closeModal(); toast("Title saved."); render(); return;
     }
     if (act==="delete-course"){
       if (!confirm("Delete this course and every question in it?")) return;
