@@ -125,7 +125,11 @@
       grid-area: title; font-size: 1.05rem; line-height: 1.28; margin: 0;
       font-weight: 600; letter-spacing: -.01em;
     }
-    .course-row .meta { grid-area: meta; margin: 0; }
+    .course-row .meta {
+      grid-area: meta; margin: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .course-row .side { grid-area: meta; margin: 0; }
     .course-row .bar-read { grid-area: bar; margin: .2rem 0 0; }
     @media (min-width: 700px) {
@@ -216,12 +220,37 @@
     .legend .chip.c4 { background: color-mix(in srgb, #8faf88 55%, var(--elevated)); }
     .legend .chip.c5 { background: color-mix(in srgb, var(--correct) 70%, var(--elevated)); }
     .legend .n { font-variant-numeric: tabular-nums; color: var(--subtle); font-size: .72rem; }
-    .conf { display: flex; flex-wrap: wrap; gap: .35rem; }
-    .conf button {
-      min-height: 2.35rem; padding: 0 .7rem; border-radius: .55rem; border: 0; cursor: pointer;
-      background: var(--elevated); color: var(--muted); font-size: .78rem; font-weight: 600;
+    .conf {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: .35rem;
     }
-    .conf button.on { background: var(--accent); color: var(--accent-fg); }
+    .conf button {
+      min-width: 0; width: 100%; min-height: 4.35rem;
+      padding: .45rem .2rem .5rem; border-radius: .7rem; border: 0; cursor: pointer;
+      background: var(--elevated); color: var(--muted);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem;
+    }
+    .conf button .n {
+      font-family: "Source Serif 4", serif; font-size: 1.2rem; font-weight: 650; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .conf button .l {
+      font-size: .68rem; font-weight: 600; line-height: 1.2; text-align: center;
+      letter-spacing: .01em;
+    }
+    .conf button.on { color: var(--accent-fg); }
+    .conf button.on.c1 { background: color-mix(in srgb, var(--wrong) 70%, var(--elevated)); }
+    .conf button.on.c2 { background: color-mix(in srgb, #c4a070 75%, var(--elevated)); }
+    .conf button.on.c3 { background: color-mix(in srgb, var(--accent) 85%, var(--elevated)); }
+    .conf button.on.c4 { background: color-mix(in srgb, #8faf88 75%, var(--elevated)); }
+    .conf button.on.c5 { background: color-mix(in srgb, var(--correct) 78%, var(--elevated)); }
+    .conf-wrap {
+      background: var(--surface); border-radius: 1rem; padding: .85rem 1rem 1rem;
+      box-shadow: var(--shadow); margin-top: .65rem;
+    }
+    .conf-wrap .conf-head { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; margin-bottom: .55rem; flex-wrap: wrap; }
+    .conf-wrap .conf-head p { margin: 0; }
     .refs { display: flex; flex-wrap: wrap; gap: .4rem; }
     .refs .chip {
       min-height: 2.15rem; padding: 0 .8rem; border-radius: 999px; border: 0; cursor: pointer;
@@ -308,6 +337,7 @@
   const YEAR_WEEK = 1;
   const LETTERS = ["A","B","C","D"];
   const CONF = ["—", "Lost", "Recognize", "With notes", "Cold", "Exam-ready"];
+  const CONF_TAB = ["—", "Lost", "Recognize", "Notes", "Cold", "Ready"];
 
   function uid(p){ return p + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
   function esc(s){
@@ -463,6 +493,26 @@
     if (picks.length) return picks.join(" · ");
     if ((cell.pages||"").trim()) return cell.pages.trim();
     return "";
+  }
+  function topicLine(cell){
+    const t = String((cell && cell.topics) || "").trim();
+    if (!t) return "";
+    return t.split(/\n/)[0].trim();
+  }
+  function confScale(cell, question){
+    return `<div class="conf-wrap">
+      <div class="conf-head">
+        <p class="eyebrow">Can I teach this back?</p>
+        <p class="small muted">${esc(question)}</p>
+      </div>
+      <div class="conf">
+        ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on c"+n:""}" data-act="conf" data-n="${n}">
+          <span class="n">${n}</span>
+          <span class="l">${CONF_TAB[n]}</span>
+        </button>`).join("")}
+      </div>
+      <p class="small subtle" style="margin:.55rem 0 0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
+    </div>`;
   }
   function refsEditor(c, cell){
     const refs = courseRefs(c);
@@ -964,11 +1014,11 @@
             (cell.notes||"").trim() ? "notes" : "",
             allDocMetas(cell).length ? allDocMetas(cell).length+" PDF" : ""
           ].filter(Boolean);
-          const emptyYear = "Year compre. All four shiftings — no weekly lecture list.";
-          const emptyLong = "Long exam. The shifting as a whole — no weekly lecture list.";
+          const emptyYear = "Year compre — no weekly topic.";
+          const emptyLong = "Long exam — the shifting as a whole.";
           const meta = (year||long)
-            ? (sourceLine(cell, c) || (cell.confidence ? interpretConf(cell.confidence).body : (year?emptyYear:emptyLong)))
-            : (sourceLine(cell, c) || (cell.topics||"").trim() || "No lecture logged");
+            ? (topicLine(cell) || (year ? emptyYear : emptyLong))
+            : (topicLine(cell) || "No topic logged");
           return `<a class="card course-row" href="#/c/${c.id}">
             <p class="mono eyebrow code">${esc(c.code)}</p>
             <h2>${esc(title)}</h2>
@@ -995,83 +1045,68 @@
     const long = isLong(week);
     const inter = interpretConf(cell.confidence);
     const weeklyBlock = `
-      <div class="grid-2" style="margin-top:1.1rem">
-        <div class="card stack">
-          <p class="eyebrow">This week’s lectures</p>
-          <label class="field">What was discussed
-            <textarea id="topics" style="min-height:5rem" placeholder="Systems, lesions, drugs, cases — whatever was introduced">${esc(cell.topics)}</textarea>
-          </label>
-          ${refsEditor(c, cell)}
-          <label class="field">Other (slides, handouts)
-            <input id="pages" type="text" value="${esc(cell.pages)}" placeholder="If it isn’t in the list above" />
-          </label>
-          <label class="field">How far I got ${cell.reading}%
+      <div class="card stack" style="margin-top:1.1rem">
+        <p class="eyebrow">This week’s lectures</p>
+        <label class="field">Topic
+          <textarea id="topics" style="min-height:4.2rem" placeholder="Title of what was covered — systems, lesions, drugs, cases">${esc(cell.topics)}</textarea>
+        </label>
+        ${refsEditor(c, cell)}
+        <label class="field">Other (slides, handouts)
+          <input id="pages" type="text" value="${esc(cell.pages)}" placeholder="If it isn’t in the list above" />
+        </label>
+        <div class="row" style="align-items:flex-end">
+          <label class="field" style="flex:1">How far I got ${cell.reading}%
             <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
           </label>
-          <label class="field">Hours on this
+          <label class="field" style="width:7.5rem">Hours
             <input id="hours" type="number" min="0" max="80" step="0.5" value="${cell.hours||0}" />
           </label>
         </div>
-        <div class="card stack">
-          <p class="eyebrow">Can I teach this back?</p>
-          <p class="small muted" style="margin:0">One score for this week of this course. Change it when it moves.</p>
-          <div class="conf">
-            ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
-          </div>
-          <p class="small subtle" style="margin:0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
-          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this week</button>
-        </div>
+      </div>
+      ${confScale(cell, "One score for this week of this course.")}
+      <div class="row" style="margin-top:.65rem">
+        <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this week</button>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
       ${notesAndFiles(id, cell, exams)}`;
     const longBlock = `
-      <div class="grid-2" style="margin-top:1.1rem">
-        <div class="card stack">
-          <p class="eyebrow">Long exam reread</p>
-          <p class="small muted" style="margin:0">This shifting as a whole. Not lecture-by-lecture.</p>
-          ${refsEditor(c, cell)}
-          <label class="field">How far the reread got ${cell.reading}%
+      <div class="card stack" style="margin-top:1.1rem">
+        <p class="eyebrow">Long exam reread</p>
+        <p class="small muted" style="margin:0">This shifting as a whole. Not lecture-by-lecture.</p>
+        ${refsEditor(c, cell)}
+        <div class="row" style="align-items:flex-end">
+          <label class="field" style="flex:1">How far the reread got ${cell.reading}%
             <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
           </label>
-          <label class="field">Hours on this review
+          <label class="field" style="width:7.5rem">Hours
             <input id="hours" type="number" min="0" max="80" step="0.5" value="${cell.hours||0}" />
           </label>
         </div>
-        <div class="card stack">
-          <p class="eyebrow">Would I sit the long exam?</p>
-          <p class="small muted" style="margin:0">One score for this course across this shifting.</p>
-          <div class="conf">
-            ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
-          </div>
-          <p class="small subtle" style="margin:0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
-          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this long exam</button>
-        </div>
+      </div>
+      ${confScale(cell, "One score for this course across this shifting.")}
+      <div class="row" style="margin-top:.65rem">
+        <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this long exam</button>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
       ${notesAndFiles(id, cell, exams)}
       <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This is the shifting as a whole.</p>`;
     const yearBlock = `
-      <div class="grid-2" style="margin-top:1.1rem">
-        <div class="card stack">
-          <p class="eyebrow">Year compre</p>
-          <p class="small muted" style="margin:0">All four shiftings. No weekly topics — how this course sits for the year exam.</p>
-          ${refsEditor(c, cell)}
-          <label class="field">How far the reread got ${cell.reading}%
+      <div class="card stack" style="margin-top:1.1rem">
+        <p class="eyebrow">Year compre</p>
+        <p class="small muted" style="margin:0">All four shiftings. No weekly topics — how this course sits for the year exam.</p>
+        ${refsEditor(c, cell)}
+        <div class="row" style="align-items:flex-end">
+          <label class="field" style="flex:1">How far the reread got ${cell.reading}%
             <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
           </label>
-          <label class="field">Hours on this review
+          <label class="field" style="width:7.5rem">Hours
             <input id="hours" type="number" min="0" max="80" step="0.5" value="${cell.hours||0}" />
           </label>
         </div>
-        <div class="card stack">
-          <p class="eyebrow">Would I sit compre?</p>
-          <p class="small muted" style="margin:0">One score for this course across the whole year.</p>
-          <div class="conf">
-            ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
-          </div>
-          <p class="small subtle" style="margin:0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
-          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this compre</button>
-        </div>
+      </div>
+      ${confScale(cell, "One score for this course across the whole year.")}
+      <div class="row" style="margin-top:.65rem">
+        <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this compre</button>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
       ${notesAndFiles(id, cell, exams)}
@@ -1082,7 +1117,7 @@
         <div>
           <p class="eyebrow">${esc(c.code)}</p>
           <h1 class="hero">${esc(displayName(c))}</h1>
-          <p class="lead">${year ? "Compre — all four shiftings." : long ? "Long exam after shifting "+shifting+"." : "Week "+week+" of shifting "+shifting+"."}</p>
+          <p class="lead">${esc(topicLine(cell) || (year ? "Compre — all four shiftings." : long ? "Long exam after shifting "+shifting+"." : "Week "+week+" of shifting "+shifting+"."))}</p>
         </div>
         <div class="row">
           <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Edit title</button>
