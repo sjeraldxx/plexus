@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Black · PLE bank</title>
+  <meta name="description" content="Twelve PLE subjects. Import items, sit a random set, simulate a board sitting." />
+  <meta name="theme-color" content="#0a0a0b" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,650&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --surface: #121214;
+      --elevated: #1a1a1e;
+      --fg: #f4f4f5;
+      --muted: #a1a1aa;
+      --subtle: #71717a;
+      --accent: #c8ccd4;
+      --accent-fg: #0a0a0b;
+      --border: color-mix(in srgb, var(--fg) 12%, transparent);
+      --correct: #8aa990;
+      --wrong: #c98983;
+      --shadow: 0 0 0 1px var(--border);
+      --radius: 12px;
+      color-scheme: dark;
+    }
+    html.light {
+      --bg: #f4f4f2;
+      --surface: #fbfbf9;
+      --elevated: #fff;
+      --fg: #141416;
+      --muted: #5c5c64;
+      --subtle: #8a8a92;
+      --accent: #2c2c32;
+      --accent-fg: #f4f4f2;
+      --border: color-mix(in srgb, var(--fg) 12%, transparent);
+      --correct: #2f6b48;
+      --wrong: #9a4038;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+      min-height: 100dvh; line-height: 1.5; font-size: 16px;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+    h1,h2,h3,.display,.stem { font-family: "Source Serif 4", "Times New Roman", serif; font-weight: 600; letter-spacing: -.02em; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    button, a, input, select, label { touch-action: manipulation; }
+    button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+    header.app {
+      position: sticky; top: 0; z-index: 20;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .bar {
+      max-width: 68rem; margin: 0 auto; min-height: 3.15rem;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .35rem 1rem;
+    }
+    .brand { display: flex; align-items: center; gap: .55rem; font-size: 1.05rem; }
+    .nav { display: flex; align-items: center; gap: .15rem; flex-wrap: wrap; justify-content: flex-end; }
+    .nav a, .icon-btn {
+      display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 .7rem;
+      border-radius: 8px; color: var(--muted); border: 0; background: transparent; cursor: pointer; font-size: .9rem;
+    }
+    .nav a:hover, .icon-btn:hover, .nav a.on { background: var(--elevated); color: var(--fg); }
+    main { max-width: 68rem; margin: 0 auto; padding: 1.15rem 1rem 3rem; }
+    main.narrow { max-width: 44rem; }
+    .eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0; }
+    .hero { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; margin: .35rem 0 0; }
+    .lead { max-width: 40rem; color: var(--muted); font-size: .95rem; margin: .4rem 0 0; }
+    .section { font-size: .68rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--subtle); margin: 1.4rem 0 .55rem; }
+    .stem { font-size: 1.18rem; line-height: 1.45; font-weight: 500; margin: .35rem 0 0; }
+    .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .card {
+      background: var(--surface); border-radius: 16px; padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+    }
+    a.card:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 22%, transparent); }
+    .grid-3 { display: grid; gap: .55rem; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+    .course-row {
+      display: grid; gap: .2rem 1rem; min-height: 4.4rem; padding: .9rem 1.05rem;
+    }
+    .course-row h2 { font-size: 1.05rem; line-height: 1.28; margin: .1rem 0 0; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      min-height: 2.4rem; padding: 0 .95rem; border-radius: 10px; border: 0; cursor: pointer;
+      background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: .88rem;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.sec { background: var(--elevated); color: var(--fg); box-shadow: var(--shadow); }
+    .btn.ghost { background: transparent; color: var(--muted); }
+    .btn.ghost:hover { color: var(--fg); background: var(--elevated); }
+    .btn.sm { min-height: 2.15rem; padding: 0 .7rem; font-size: .8rem; }
+    .btn.warn { background: color-mix(in srgb, var(--wrong) 22%, transparent); color: var(--wrong); }
+    .muted { color: var(--muted); } .subtle { color: var(--subtle); } .small { font-size: .875rem; }
+    .stack { display: grid; gap: .7rem; }
+    label.field { display: grid; gap: .35rem; font-size: .8rem; color: var(--muted); }
+    input[type=text], input[type=number], select, textarea {
+      background: var(--elevated); border: 1px solid var(--border); border-radius: 10px;
+      padding: .7rem .85rem; outline: none; width: 100%; font-size: 16px;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    .opt {
+      display: flex; gap: .8rem; align-items: flex-start; width: 100%; text-align: left;
+      background: var(--elevated); border: 1px solid transparent; border-radius: 12px;
+      padding: .95rem 1rem; cursor: pointer; color: var(--fg); min-height: 3rem;
+    }
+    .opt:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+    .opt .ltr {
+      flex: none; width: 1.75rem; height: 1.75rem; border-radius: 8px;
+      display: grid; place-items: center; background: var(--surface); font-size: .8rem; font-weight: 600;
+    }
+    .opt.ok { background: color-mix(in srgb, var(--correct) 16%, var(--elevated)); }
+    .opt.bad { background: color-mix(in srgb, var(--wrong) 16%, var(--elevated)); }
+    .opt:disabled { cursor: default; }
+    .rationale { background: var(--elevated); border-radius: 12px; padding: .85rem 1rem; font-size: .92rem; }
+    .sit-mon {
+      display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: .7rem; align-items: center;
+      background: var(--surface); border-radius: 14px; padding: .7rem .95rem; box-shadow: var(--shadow);
+      margin: .75rem 0 1rem;
+    }
+    .sit-mon .timer {
+      font-family: "Source Serif 4", serif; font-size: 1.45rem; font-weight: 650;
+      font-variant-numeric: tabular-nums; min-width: 3.2rem; line-height: 1;
+    }
+    .sit-mon .timer.warn { color: var(--wrong); }
+    .tbar { height: .28rem; background: var(--elevated); border-radius: 99px; overflow: hidden; margin-top: .35rem; }
+    .tbar > span { display: block; height: 100%; background: var(--accent); }
+    .mode-pill {
+      display: inline-flex; align-items: center; min-height: 1.45rem; padding: 0 .5rem;
+      border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+      background: var(--elevated); color: var(--muted);
+    }
+    .stat { background: var(--surface); border-radius: 14px; padding: .7rem .9rem; box-shadow: var(--shadow); }
+    .stat .k { font-size: .7rem; color: var(--muted); margin: 0; letter-spacing: .04em; text-transform: uppercase; }
+    .stat .v { font-family: "Source Serif 4", serif; font-size: 1.25rem; margin: .15rem 0 0; font-variant-numeric: tabular-nums; }
+    .toast {
+      position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem; z-index: 50;
+      background: var(--elevated); color: var(--fg); padding: .75rem 1rem; border-radius: 12px;
+      box-shadow: var(--shadow); font-size: .875rem; max-width: min(22rem, calc(100vw - 2rem));
+    }
+    .overlay {
+      position: fixed; inset: 0; background: rgba(8,8,10,.62); z-index: 40;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    @media (min-width: 720px) { .overlay { align-items: center; padding: 1.25rem; } }
+    .modal {
+      background: var(--surface); width: min(28rem, 100%); max-height: min(92dvh, 100%); overflow: auto;
+      padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+      box-shadow: var(--shadow); border-radius: 20px 20px 0 0;
+    }
+    @media (min-width: 720px) { .modal { border-radius: 16px; } }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th { text-align: left; color: var(--subtle); font-weight: 500; padding: .45rem .3rem; }
+    td { padding: .5rem .3rem; border-top: 1px solid var(--border); vertical-align: top; }
+    .mark { width: 1.1rem; height: 1.1rem; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="modal"></div>
+  <div id="toast" class="toast" hidden></div>
+  <script>
+(function () {
+  "use strict";
+  const STORE = "black-v1";
+  const LETTERS = ["A","B","C","D"];
+  const CSV_HEADER = "question,option_a,option_b,option_c,option_d,correct,rationale";
+  const PLE = [
+    { id:"physio", short:"Physiology", name:"Physiology", day:1 },
+    { id:"legal", short:"Legal medicine & ethics", name:"Legal Medicine, Medical Jurisprudence and Medical Ethics", day:1 },
+    { id:"path", short:"Pathology", name:"Pathology", day:1 },
+    { id:"biochem", short:"Biochemistry", name:"Biochemistry", day:2 },
+    { id:"anat", short:"Anatomy & histology", name:"Anatomy and Histology", day:2 },
+    { id:"micro", short:"Microbiology & parasitology", name:"Microbiology and Parasitology", day:2 },
+    { id:"obgyn", short:"OB-GYN", name:"Obstetrics and Gynecology", day:3 },
+    { id:"peds", short:"Pediatrics & nutrition", name:"Pediatrics and Nutrition", day:3 },
+    { id:"preven", short:"Preventive medicine", name:"Preventive Medicine and Public Health", day:3 },
+    { id:"pharma", short:"Pharmacology", name:"Pharmacology and Therapeutics", day:4 },
+    { id:"surg", short:"Surgery, Ophtha & ORL", name:"Surgery and Ophthalmology, Otolaryngology and Rhinology", day:4 },
+    { id:"med", short:"Medicine", name:"Medicine", day:4 }
+  ];
+  const CSV_SAMPLE = CSV_HEADER + ",subject\n" +
+    "\"Which nerve innervates serratus anterior?\",\"Long thoracic\",\"Thoracodorsal\",\"Dorsal scapular\",\"Suprascapular\",A,\"The long thoracic nerve (C5–C7) supplies serratus anterior.\",\"Anatomy and Histology\"\n" +
+    "\"The sternal angle corresponds to which disc?\",\"T2/T3\",\"T4/T5\",\"T6/T7\",\"T8/T9\",B,\"The sternal angle of Louis marks T4/T5.\",\"Anatomy and Histology\"\n";
+
+  function uid(p){ return p + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+  function esc(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, c => ({
+      "&": "&"+"amp;", "<": "&"+"lt;", ">": "&"+"gt;", '"': "&"+"quot;", "'": "&#39;"
+    }[c]));
+  }
+  function pct(n,d){ return d<=0 ? 0 : Math.round(n/d*100); }
+  function nHead(h){ return String(h||"").trim().toLowerCase().replace(/[\s-]+/g,"_"); }
+  function pleById(id){ return PLE.find(p => p.id===id); }
+  function matchPle(raw){
+    const s = nHead(raw);
+    if (!s) return null;
+    return PLE.find(p => p.id===s || nHead(p.short)===s || nHead(p.name)===s)
+      || PLE.find(p => nHead(p.name).indexOf(s)>=0 || s.indexOf(p.id)>=0 || s.indexOf(nHead(p.short))>=0);
+  }
+  function markSvg(){
+    return `<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" fill="currentColor"/></svg>`;
+  }
+
+  function defaultState(){
+    return { theme:"dark", questions:[], attempts:[], drafts:[], session:null, nickname:"" };
+  }
+  function load(){
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (!raw) return defaultState();
+      const d = JSON.parse(raw);
+      return Object.assign(defaultState(), d, {
+        questions: d.questions||[], attempts: d.attempts||[], drafts: d.drafts||[]
+      });
+    } catch(e){ return defaultState(); }
+  }
+  function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch(e){} }
+  let state = load();
+  document.documentElement.classList.toggle("light", state.theme==="light");
+
+  let toastT = null;
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { el.hidden = true; }, 2400);
+  }
+  function route(){
+    const h = (location.hash || "#/").replace(/^#/, "") || "/";
+    const parts = h.split("/").filter(Boolean);
+    if (!parts.length) return {name:"hub"};
+    if (parts[0]==="s" && parts[1]) return {name:"subject", id:parts[1]};
+    if (parts[0]==="sit" && parts[1]) return {name:"sit", id:parts[1]};
+    if (parts[0]==="results") return {name:"results"};
+    if (parts[0]==="you") return {name:"you"};
+    return {name:"hub"};
+  }
+  function go(hash){ location.hash = hash; }
+
+  function detectDelim(text){
+    const sample = text.split(/\r?\n/).slice(0,6).join("\n");
+    const c=(sample.match(/,/g)||[]).length, s=(sample.match(/;/g)||[]).length, t=(sample.match(/\t/g)||[]).length;
+    if (t>c && t>s) return "\t"; if (s>c) return ";"; return ",";
+  }
+  function parseCsvText(text){
+    const raw = String(text||"").replace(/^\uFEFF/,"");
+    const delim = detectDelim(raw);
+    const rows=[]; let row=[], cell="", inQ=false;
+    for (let i=0;i<raw.length;i++){
+      const ch=raw[i], next=raw[i+1];
+      if (inQ){
+        if (ch==='"'){ if(next==='"'){ cell+='"'; i++; } else inQ=false; }
+        else cell+=ch;
+      } else if (ch==='"') inQ=true;
+      else if (ch===delim){ row.push(cell); cell=""; }
+      else if (ch==="\n"){ row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row); row=[]; cell=""; }
+      else if (ch!=="\r") cell+=ch;
+    }
+    row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row);
+    return rows.map(r => r.map(c => c.trim()));
+  }
+  function lookup(map, keys){ for (const k of keys) if (map[k]) return map[k]; return ""; }
+  function splitOptions(v){
+    if (!v) return [];
+    const parts = v.includes("|") ? v.split("|") : v.includes(";") ? v.split(";") : String(v).split(/\s*\n\s*/);
+    return parts.map(p => p.trim().replace(/^[A-Da-d][.)]\s*/, "")).filter(Boolean);
+  }
+  function resolveCorrect(correct, options){
+    const raw = String(correct||"").trim(); if (!raw) return -1;
+    const letter = raw.replace(/[^A-Za-z0-9]/g,"");
+    if (/^[A-Da-d]$/.test(letter)) return letter.toUpperCase().charCodeAt(0)-65;
+    if (/^[1-4]$/.test(letter)) return Number(letter)-1;
+    const lower = raw.toLowerCase();
+    let i = options.findIndex(o => o.toLowerCase()===lower);
+    if (i>=0) return i;
+    return options.findIndex(o => o.toLowerCase().includes(lower) || lower.includes(o.toLowerCase()));
+  }
+  function interpretCsv(text){
+    const table = parseCsvText(text);
+    const errors=[];
+    if (!table.length) return {rows:[], errors:[{line:1,message:"File is empty."}]};
+    const STEM=["question","stem","q","item","prompt"];
+    const RAT=["rationale","explanation","explain","discussion","reason"];
+    const COR=["correct","answer","correct_answer","correctanswer","key","ans"];
+    const OPT=["options","choices","choices_text"];
+    const SUB=["subject","course","ple","ple_subject","subj"];
+    const COLS=[
+      ["option_a","optiona","a","choice_a","choicea","option1","opt_a","opt1"],
+      ["option_b","optionb","b","choice_b","choiceb","option2","opt_b","opt2"],
+      ["option_c","optionc","c","choice_c","choicec","option3","opt_c","opt3"],
+      ["option_d","optiond","d","choice_d","choiced","option4","opt_d","opt4"]
+    ];
+    const first = table[0].map(nHead);
+    const hasHeader = first.some(h => STEM.includes(h)||COR.includes(h)||RAT.includes(h)||h==="option_a"||h==="options"||h==="a"||h==="subject");
+    let headers = first, body = table.slice(1);
+    if (!hasHeader){ headers=["question","option_a","option_b","option_c","option_d","correct","rationale","subject"]; body=table; }
+    const rows=[];
+    body.forEach((cols,i) => {
+      const line = hasHeader ? i+2 : i+1;
+      const map={}; headers.forEach((h,idx)=> map[h]=cols[idx]||"");
+      const stem = lookup(map, STEM);
+      const rationale = lookup(map, RAT);
+      const packed = lookup(map, OPT);
+      let options = packed ? splitOptions(packed) : COLS.map(k => lookup(map,k)).filter(Boolean);
+      if (!stem){ errors.push({line,message:"Missing question text."}); return; }
+      if (options.length<2){ errors.push({line,message:"Need at least two options."}); return; }
+      if (options.length>4) options = options.slice(0,4);
+      const ci = resolveCorrect(lookup(map,COR), options);
+      if (ci<0 || ci>=options.length){ errors.push({line,message:"Could not match correct answer. Use A–D or the option text."}); return; }
+      rows.push({stem, options, correctIndex:ci, rationale, subject: lookup(map, SUB)});
+    });
+    return {rows, errors};
+  }
+  function qKey(q){
+    return String(q && q.stem || "").toLowerCase().replace(/[''`]/g,"'").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+  }
+  function download(filename, contents, mime){
+    const blob = new Blob([contents], {type: mime||"text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function count(id){ return state.questions.filter(q => !id || q.subjectId===id).length; }
+  function filtered(filter){
+    let pool = state.questions.slice();
+    if (filter && filter.subjectId) pool = pool.filter(q => q.subjectId===filter.subjectId);
+    if (filter && filter.day) pool = pool.filter(q => {
+      const p = pleById(q.subjectId); return p && p.day===Number(filter.day);
+    });
+    return pool;
+  }
+  function shuffleCopy(questions){
+    const qs = (questions||[]).map(q => Object.assign({}, q, { options: (q.options||[]).slice() }));
+    for (let i=qs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=qs[i]; qs[i]=qs[j]; qs[j]=t; }
+    return qs;
+  }
+  function draw(filter){
+    const pool = shuffleCopy(filtered(filter));
+    const n = Math.min(Math.max(1, Number(filter && filter.n) || 20), pool.length);
+    return pool.slice(0, n);
+  }
+
+  function ingestCsv(files, subjectId){
+    Promise.all([...files].map(f => f.text().then(text => ({name:f.name, text}))))
+      .then(list => {
+        let rows=[], errors=[];
+        list.forEach(f => {
+          const r = interpretCsv(f.text);
+          rows = rows.concat(r.rows);
+          r.errors.forEach(e => errors.push(Object.assign({file:f.name}, e)));
+        });
+        if (!rows.length){
+          const e0 = errors[0];
+          toast(e0 ? ((e0.file?e0.file+" ":"")+"line "+e0.line+": "+e0.message) : "No questions in that CSV.");
+          return;
+        }
+        const seen = new Set(state.questions.map(qKey));
+        let added=0, dupes=0, skipped=0;
+        rows.forEach(r => {
+          const sub = matchPle(r.subject) || pleById(subjectId);
+          if (!sub){ skipped++; return; }
+          const k = qKey(r);
+          if (!k) return;
+          if (seen.has(k)){ dupes++; return; }
+          seen.add(k);
+          state.questions.push({
+            id: uid("q"), subjectId: sub.id, stem: r.stem,
+            options: r.options.slice(), correctIndex: r.correctIndex, rationale: r.rationale||""
+          });
+          added++;
+        });
+        save();
+        const bits = [added+" added"];
+        if (dupes) bits.push(dupes+" copy skipped");
+        if (skipped) bits.push(skipped+" unmatched subject");
+        if (errors.length) bits.push(errors.length+" invalid");
+        toast(bits.join(" · "));
+        render();
+      })
+      .catch(() => toast("Could not read that CSV."));
+  }
+
+  let pendingSit = null;
+  function parkSession(){
+    const ses = state.session;
+    if (!ses || ses.finishedAt || !ses.questions || !ses.questions.length) return;
+    state.drafts = (state.drafts||[]).filter(d => d.examId !== ses.examId);
+    state.drafts.unshift({
+      examId: ses.examId, title: ses.title, filter: ses.filter, mode: ses.mode,
+      questions: ses.questions, answers: ses.answers, index: ses.index,
+      startedAt: ses.startedAt, parkedAt: Date.now()
+    });
+  }
+  function unfinished(){
+    const list = (state.drafts||[]).slice();
+    const ses = state.session;
+    if (ses && !ses.finishedAt && ses.questions && ses.questions.length && !list.some(d => d.examId===ses.examId)) list.unshift(ses);
+    return list;
+  }
+  function startPool(opts){
+    parkSession();
+    const questions = shuffleCopy(opts.questions);
+    if (!questions.length) return false;
+    state.drafts = (state.drafts||[]).filter(d => d.examId!==opts.examId);
+    state.session = {
+      examId: opts.examId, title: opts.title, filter: opts.filter||null, mode: opts.mode||"review",
+      questions, answers: questions.map(()=>null), index: 0,
+      startedAt: Date.now(), qStartedAt: Date.now(), finishedAt: null
+    };
+    save();
+    return true;
+  }
+  function sitStats(ses){
+    let correct=0, covered=0;
+    (ses.answers||[]).forEach((a,i) => {
+      if (a==null) return;
+      covered++;
+      if (a===ses.questions[i].correctIndex) correct++;
+    });
+    return { correct, covered, total: (ses.questions||[]).length };
+  }
+  function closeSit(){
+    const ses = state.session;
+    if (!ses) return;
+    ses.finishedAt = Date.now();
+    state.drafts = (state.drafts||[]).filter(d => d.examId!==ses.examId);
+    const st = sitStats(ses);
+    state.attempts.unshift({
+      id: uid("att"), at: ses.finishedAt, title: ses.title, examId: ses.examId,
+      correct: st.correct, total: st.total, covered: st.covered, mode: ses.mode||"review"
+    });
+    save(); go("#/results");
+  }
+  function advanceSit(){
+    const ses = state.session;
+    if (!ses) return;
+    if (ses.index >= ses.questions.length-1){ closeSit(); return; }
+    ses.index++; ses.qStartedAt = Date.now(); save(); render();
+  }
+  let timerIv = null;
+  function stopTimer(){ if (timerIv){ clearInterval(timerIv); timerIv = null; } }
+  function remainingSec(){
+    const ses = state.session;
+    if (!ses || !ses.qStartedAt) return 60;
+    return Math.max(0, 60 - Math.floor((Date.now() - ses.qStartedAt)/1000));
+  }
+  function startTimer(){
+    stopTimer();
+    const el = document.getElementById("q-timer");
+    const ses = state.session;
+    if (!el || !ses || ses.finishedAt) return;
+    if (ses.answers[ses.index]!=null) return;
+    if (!ses.qStartedAt) ses.qStartedAt = Date.now();
+    const tick = () => {
+      const left = remainingSec();
+      el.textContent = left+"s";
+      el.classList.toggle("warn", left<=10);
+      const bar = document.getElementById("q-tbar");
+      if (bar) bar.style.width = (left/60*100)+"%";
+      if (left<=0){ stopTimer(); handleAct({ dataset: { act: "time-up" } }); }
+    };
+    tick();
+    timerIv = setInterval(tick, 200);
+  }
+
+  function closeModal(){ document.getElementById("modal").innerHTML = ""; }
+  function openModal(html){
+    const root = document.getElementById("modal");
+    root.innerHTML = `<div class="overlay" id="overlay"><div class="modal" role="dialog">${html}</div></div>`;
+    const overlay = document.getElementById("overlay");
+    overlay.addEventListener("click", (e) => { if (e.target===overlay) closeModal(); });
+    overlay.querySelector(".modal").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const t = e.target.closest("[data-act]");
+      if (t && t.tagName !== "FORM") handleAct(t, e);
+    });
+  }
+  function askMode(){
+    openModal(`<p class="eyebrow">How to sit</p>
+      <h3 style="margin:.3rem 0 .45rem">60 seconds on each item.</h3>
+      <p class="small muted">Individual shows the key after I pick. Rapid hides it until I finish or end — score is on items I covered.</p>
+      <div class="stack" style="margin-top:1rem">
+        <button class="btn" type="button" data-act="start-sit" data-mode="review">Individual review</button>
+        <button class="btn sec" type="button" data-act="start-sit" data-mode="rapid">Rapid review</button>
+        <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+      </div>`);
+  }
+  function queueSit(payload){ pendingSit = payload; askMode(); }
+
+  function shell(inner, wide){
+    const r = route();
+    const sitting = r.name==="sit" || r.name==="results";
+    return `<header class="app"><div class="bar">
+      <a class="brand display" href="#/">${markSvg()}Black</a>
+      <nav class="nav">
+        <a href="#/" class="${r.name==="hub"||r.name==="subject"?"on":""}">Bank</a>
+        <a href="#/" class="${sitting?"on":""}" data-act="ask-sim">Simulate</a>
+        <a href="#/you" class="${r.name==="you"?"on":""}">You</a>
+        <button class="icon-btn" type="button" data-act="theme">${state.theme==="light"?"Dark":"Light"}</button>
+      </nav>
+    </div></header>
+    <main class="${wide?"wide":"narrow"}">${inner}</main>`;
+  }
+
+  function viewHub(){
+    const total = count();
+    const last = state.attempts.slice(0,6);
+    const open = unfinished();
+    return shell(`
+      <p class="eyebrow">Physician Licensure Examination</p>
+      <h1 class="hero">Twelve subjects. Four days.</h1>
+      <p class="lead">PRC Board of Medicine. Import items by subject, then draw a random set from whatever is already in the pool — one subject, one day, or mixed.</p>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" type="button" data-act="ask-sim">Simulate a sitting</button>
+        <button class="btn ghost" type="button" data-act="csv-template">CSV template</button>
+      </div>
+      <p class="small muted" style="margin-top:.55rem">${total? total+" item"+(total===1?"":"s")+" in the bank.":"Bank is empty. Open a subject and import a CSV."} First row: <span class="mono">${CSV_HEADER}</span>. Optional column <span class="mono">subject</span>.</p>
+      ${open.length?`<p class="section">Unfinished</p>
+        <div class="stack">${open.map(d => `<div class="card row" style="justify-content:space-between">
+          <div><p class="display" style="margin:0;font-size:1.05rem">${esc(d.title)}</p>
+          <p class="small muted" style="margin:.15rem 0 0">Item ${(d.index||0)+1} of ${(d.questions||[]).length}</p></div>
+          <div class="row">
+            <button class="btn sm" type="button" data-act="resume" data-id="${esc(d.examId)}">Resume</button>
+            <button class="btn ghost sm" type="button" data-act="drop" data-id="${esc(d.examId)}">Drop</button>
+          </div>
+        </div>`).join("")}</div>`:""}
+      ${[1,2,3,4].map(d => `
+        <p class="section">Day ${d}</p>
+        <div class="grid-3">
+          ${PLE.filter(p => p.day===d).map(p => {
+            const n = count(p.id);
+            return `<a class="card course-row" href="#/s/${p.id}">
+              <p class="mono eyebrow">D${d}</p>
+              <h2>${esc(p.short)}</h2>
+              <p class="small muted">${esc(p.name)}</p>
+              <p class="small subtle">${n? n+" in the pool":"No items yet"}</p>
+            </a>`;
+          }).join("")}
+        </div>`).join("")}
+      ${last.length?`<p class="section">Recent sittings</p>
+        <div class="stack">${last.map(a => `<div class="card"><p class="display" style="margin:0;font-size:1.05rem">${esc(a.title)}</p>
+          <p class="small muted" style="margin:.2rem 0 0">${a.correct} of ${a.covered||a.total} covered · ${pct(a.correct, a.covered||a.total)}% · ${new Date(a.at).toLocaleString()}</p></div>`).join("")}</div>`:""}
+      <p class="small subtle" style="margin-top:1.4rem">Passing the PLE needs a 75% general average, with no subject below 50%. This bank is a sitting, not the exam.</p>
+    `, true);
+  }
+
+  function viewSubject(id){
+    const p = pleById(id);
+    if (!p) return shell(`<p class="muted">That isn’t a PLE subject.</p><p><a class="btn" href="#/">Bank</a></p>`);
+    const n = count(p.id);
+    return shell(`
+      <a class="small muted" href="#/">← Twelve subjects</a>
+      <p class="eyebrow" style="margin-top:.7rem">Day ${p.day}</p>
+      <h1 class="hero">${esc(p.short)}</h1>
+      <p class="lead">${esc(p.name)}. ${n? n+" item"+(n===1?"":"s")+" in this pool.":"Nothing imported yet."}</p>
+      <div class="card stack" style="margin-top:1rem">
+        <p class="eyebrow">Import</p>
+        <p class="small muted" style="margin:0">CSV first row: <span class="mono">${CSV_HEADER}</span>. Optional <span class="mono">subject</span>. Copies of the same stem stay once. Import again anytime — only new stems add.</p>
+        <div class="row">
+          <label class="btn">Import CSV<input class="csv-in" type="file" accept=".csv,text/csv,text/plain" multiple hidden data-subject="${p.id}" /></label>
+          <button class="btn ghost" type="button" data-act="csv-template">CSV template</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" type="button" data-act="ask-sim" data-subject="${p.id}" ${n?"":"disabled"}>Sit a random set</button>
+      </div>
+    `);
+  }
+
+  function viewSit(id){
+    let ses = state.session;
+    if (!ses || ses.finishedAt || ses.examId!==id || !ses.questions || !ses.questions.length){
+      const d = unfinished().find(x => x.examId===id);
+      if (d){
+        state.drafts = (state.drafts||[]).filter(x => x.examId!==id);
+        state.session = {
+          examId: d.examId, title: d.title, filter: d.filter, mode: d.mode||"review",
+          questions: d.questions, answers: d.answers, index: d.index||0,
+          startedAt: d.startedAt, qStartedAt: Date.now(), finishedAt: null
+        };
+        save();
+        ses = state.session;
+      } else return shell(`<p class="muted">No items to sit.</p><p><a class="btn" href="#/">Bank</a></p>`);
+    }
+    const q = ses.questions[ses.index];
+    const chosen = ses.answers[ses.index];
+    const locked = chosen!==null && chosen!==undefined;
+    const isLast = ses.index===ses.questions.length-1;
+    const rapid = ses.mode==="rapid";
+    const st = sitStats(ses);
+    const left = locked ? 0 : remainingSec();
+    const timed = chosen===-1;
+    return shell(`
+      <p class="eyebrow">${esc(ses.title)}</p>
+      <div class="sit-mon">
+        <div>
+          <p id="q-timer" class="timer${left<=10 && !locked?" warn":""}" style="margin:0">${locked?"—":left+"s"}</p>
+          <p class="small subtle" style="margin:.15rem 0 0">60s / item</p>
+        </div>
+        <div>
+          <div class="row" style="gap:.45rem">
+            <span class="mode-pill">${rapid?"Rapid":"Individual"}</span>
+            <span class="small muted">Item ${ses.index+1} of ${ses.questions.length}</span>
+          </div>
+          <p class="small subtle" style="margin:.25rem 0 0">${rapid ? st.covered+" covered" : st.correct+" correct · "+st.covered+" covered"}</p>
+          <div class="tbar"><span id="q-tbar" style="width:${locked?0:(left/60*100)}%"></span></div>
+        </div>
+        <button class="btn ghost sm" type="button" data-act="end-sit">End</button>
+      </div>
+      <h1 class="stem">${esc(q.stem)}</h1>
+      <div class="stack" style="margin-top:1rem">
+        ${q.options.map((opt,i) => {
+          let cls="opt";
+          if (!rapid && locked && i===q.correctIndex) cls+=" ok";
+          else if (!rapid && locked && chosen===i && i!==q.correctIndex) cls+=" bad";
+          return `<button class="${cls}" data-act="answer" data-i="${i}" ${locked?"disabled":""}><span class="ltr">${LETTERS[i]}</span><span>${esc(opt)}</span></button>`;
+        }).join("")}
+      </div>
+      ${!rapid && locked?`<div class="rationale" style="margin-top:1rem">
+        <p class="small" style="margin:0;color:${chosen===q.correctIndex?"var(--correct)":"var(--wrong)"}">${chosen===q.correctIndex?"That’s it.": timed?"Time.":"Not this one."} Answer ${LETTERS[q.correctIndex]}.</p>
+        <p class="small" style="margin:.4rem 0 0">${esc(q.rationale||"")}</p>
+      </div>`:""}
+      <div class="row" style="margin-top:1.1rem;justify-content:space-between">
+        ${rapid?`<span class="small muted">Key after I stop.</span>`:`<button class="btn sec" type="button" data-act="prev-q" ${ses.index===0?"disabled":""}>Previous</button>`}
+        ${isLast?`<button class="btn" type="button" data-act="end-sit">See score</button>`:
+          rapid?`<span class="small subtle">Next when I pick, or at 0s.</span>`:`<button class="btn" type="button" data-act="next-q" ${locked?"":"disabled"}>Next</button>`}
+      </div>
+    `);
+  }
+
+  function viewResults(){
+    const ses = state.session;
+    if (!ses || !ses.finishedAt) return shell(`<p class="muted">Nothing scored yet.</p><p><a class="btn" href="#/">Bank</a></p>`);
+    const st = sitStats(ses);
+    const denom = st.covered || 0;
+    const p = denom ? pct(st.correct, denom) : 0;
+    let read = p>=75 ? "At or above the 75% PLE average — on what I covered." : p>=50 ? "Above the 50% floor, short of 75%." : "Below the 50% subject floor.";
+    return shell(`
+      <p class="eyebrow">${ses.mode==="rapid"?"Rapid":"Individual"}</p>
+      <h1 class="hero">${p}%</h1>
+      <p class="lead">${esc(ses.title)} · ${st.correct} correct of ${st.covered} covered${st.covered!==st.total?" · "+(st.total-st.covered)+" not opened":""} · ${st.total} drawn. ${read}</p>
+      <div class="row" style="margin:1rem 0">
+        <a class="btn" href="#/">Bank</a>
+        <button class="btn sec" type="button" data-act="sit-again">Sit another draw</button>
+      </div>
+      <div class="card" style="overflow:auto">
+        <table>
+          <thead><tr><th>#</th><th>Stem</th><th>Yours</th><th>Key</th></tr></thead>
+          <tbody>${ses.questions.map((q,i) => {
+            const a = ses.answers[i];
+            const opened = a!=null;
+            const ok = a===q.correctIndex;
+            const sub = pleById(q.subjectId);
+            return `<tr>
+              <td class="mono">${i+1}</td>
+              <td>${esc(q.stem.slice(0,110))}${sub?`<p class="small subtle" style="margin:.2rem 0 0">${esc(sub.short)}</p>`:""}${q.rationale && opened?`<p class="small muted" style="margin:.25rem 0 0">${esc(q.rationale)}</p>`:""}</td>
+              <td style="color:${!opened?"var(--subtle)":ok?"var(--correct)":"var(--wrong)"}">${!opened?"—":a<0?"Time":LETTERS[a]}</td>
+              <td>${LETTERS[q.correctIndex]}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+    `);
+  }
+
+  function viewYou(){
+    return shell(`
+      <p class="eyebrow">You</p>
+      <h1 class="hero">${state.nickname? "Hello, "+esc(state.nickname)+"." : "This device."}</h1>
+      <p class="lead">${count()} items in the bank. Laptop and iPad do not share this log.</p>
+      <label class="field" style="margin-top:1rem">What I go by
+        <input id="nick" type="text" value="${esc(state.nickname)}" placeholder="e.g. Jerald" />
+      </label>
+      <div class="row" style="margin-top:.8rem">
+        <button class="btn" type="button" data-act="save-nick">Save</button>
+      </div>
+      <p class="section">This device</p>
+      <div class="row">
+        <button class="btn sec" type="button" data-act="export">Save transfer file</button>
+        <label class="btn ghost">Restore<input id="restore" type="file" accept="application/json,.json" hidden /></label>
+        <button class="btn warn" type="button" data-act="ask-wipe">Wipe</button>
+      </div>
+    `);
+  }
+
+  function bind(){
+    stopTimer();
+    const app = document.getElementById("app");
+    app.onclick = (e) => {
+      const t = e.target.closest("[data-act]");
+      if (t && t.tagName !== "FORM"){ e.preventDefault(); e.stopPropagation(); handleAct(t, e); }
+    };
+    document.querySelectorAll("input.csv-in").forEach(el => {
+      el.onchange = () => {
+        const files = [...(el.files||[])];
+        const subjectId = el.getAttribute("data-subject");
+        el.value = "";
+        if (files.length) ingestCsv(files, subjectId);
+      };
+    });
+    const restore = document.getElementById("restore");
+    if (restore) restore.onchange = () => {
+      const f = restore.files && restore.files[0]; restore.value="";
+      if (!f) return;
+      f.text().then(text => {
+        const dump = JSON.parse(text);
+        if (!Array.isArray(dump.questions)) throw new Error("bad");
+        if (!confirm("Replace this bank with the transfer file?")) return;
+        state = Object.assign(defaultState(), dump);
+        document.documentElement.classList.toggle("light", state.theme==="light");
+        save(); toast("This device now matches the other one."); go("#/");
+      }).catch(() => toast("That isn’t a Black transfer file."));
+    };
+    window.onkeydown = (e) => { if (e.key==="Escape" && document.querySelector(".overlay")) closeModal(); };
+    startTimer();
+  }
+
+  function handleAct(t){
+    const act = t.dataset.act;
+    if (act==="theme"){
+      state.theme = state.theme==="light"?"dark":"light";
+      document.documentElement.classList.toggle("light", state.theme==="light");
+      save(); render(); return;
+    }
+    if (act==="close-modal"){ closeModal(); return; }
+    if (act==="csv-template"){
+      download("black-ple.csv", CSV_SAMPLE, "text/csv");
+      toast("Template saved."); return;
+    }
+    if (act==="save-nick"){
+      state.nickname = ((document.getElementById("nick")||{}).value||"").trim();
+      save(); toast("Saved."); go("#/"); return;
+    }
+    if (act==="ask-sim"){
+      const sub = t.dataset.subject || "";
+      const nAvail = filtered(sub?{subjectId:sub}:{}).length;
+      if (!nAvail){ toast("Import items into the bank first."); return; }
+      openModal(`<p class="eyebrow">${sub?"This subject":"Simulate a sitting"}</p>
+        <h3 style="margin:.3rem 0 .45rem">Random draw from the pool.</h3>
+        <p class="small muted">${nAvail} available. Items shuffle. 60 seconds each after the next step.</p>
+        ${sub?"":`<label class="field">From
+          <select id="sim-from">
+            <option value="all">All twelve subjects</option>
+            <option value="day-1">Day 1 · Physio, legal, path</option>
+            <option value="day-2">Day 2 · Biochem, anatomy, micro</option>
+            <option value="day-3">Day 3 · OB-GYN, peds, preventive</option>
+            <option value="day-4">Day 4 · Pharma, surgery, medicine</option>
+            ${PLE.map(p => `<option value="sub-${p.id}">${esc(p.short)}</option>`).join("")}
+          </select>
+        </label>`}
+        <label class="field" style="margin-top:.6rem">How many items
+          <input id="sim-n" type="number" min="1" max="${nAvail}" value="${Math.min(20,nAvail)}" />
+        </label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="sim-go" data-subject="${sub}">Continue</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="sim-go"){
+      const filter = {};
+      if (t.dataset.subject) filter.subjectId = t.dataset.subject;
+      else {
+        const from = ((document.getElementById("sim-from")||{}).value||"all");
+        if (from.indexOf("day-")===0) filter.day = Number(from.slice(4));
+        if (from.indexOf("sub-")===0) filter.subjectId = from.slice(4);
+      }
+      filter.n = Number((document.getElementById("sim-n")||{}).value||20);
+      const questions = draw(filter);
+      if (!questions.length){ toast("Nothing in that slice of the bank."); return; }
+      closeModal();
+      const label = filter.subjectId ? (pleById(filter.subjectId)||{}).short
+        : filter.day ? ("Day "+filter.day)
+        : "Mixed PLE";
+      queueSit({
+        examId: uid("sit"), title: label+" · "+questions.length,
+        questions, filter
+      });
+      return;
+    }
+    if (act==="start-sit"){
+      const payload = pendingSit; pendingSit = null;
+      if (!payload){ closeModal(); return; }
+      closeModal();
+      payload.mode = t.dataset.mode || "review";
+      startPool(payload);
+      go("#/sit/"+payload.examId);
+      return;
+    }
+    if (act==="sit-again"){
+      const ses = state.session;
+      if (!ses || !ses.filter){ handleAct({ dataset:{ act:"ask-sim" } }); return; }
+      const questions = draw(ses.filter);
+      if (!questions.length){ toast("Nothing left in that slice."); return; }
+      queueSit({ examId: uid("sit"), title: ses.title.replace(/\s·\s\d+$/, "")+" · "+questions.length, questions, filter: ses.filter });
+      return;
+    }
+    if (act==="resume"){
+      const d = unfinished().find(x => x.examId===t.dataset.id);
+      if (!d){ toast("That sitting is gone."); return; }
+      go("#/sit/"+d.examId); return;
+    }
+    if (act==="drop"){
+      state.drafts = (state.drafts||[]).filter(d => d.examId!==t.dataset.id);
+      if (state.session && state.session.examId===t.dataset.id) state.session = null;
+      save(); toast("Dropped."); render(); return;
+    }
+    if (act==="answer"){
+      const ses = state.session; if (!ses || ses.answers[ses.index]!=null) return;
+      ses.answers[ses.index] = Number(t.dataset.i);
+      stopTimer();
+      if (ses.mode==="rapid"){ advanceSit(); return; }
+      save(); render(); return;
+    }
+    if (act==="time-up"){
+      const ses = state.session; if (!ses || ses.answers[ses.index]!=null) return;
+      ses.answers[ses.index] = -1;
+      if (ses.mode==="rapid"){ advanceSit(); return; }
+      save(); render(); return;
+    }
+    if (act==="next-q"){
+      const ses=state.session; if (!ses) return;
+      if (ses.index<ses.questions.length-1){ ses.index++; ses.qStartedAt = Date.now(); save(); render(); }
+      return;
+    }
+    if (act==="prev-q"){
+      const ses=state.session; if (!ses || ses.mode==="rapid") return;
+      if (ses.index>0){ ses.index--; ses.qStartedAt = Date.now(); save(); render(); }
+      return;
+    }
+    if (act==="end-sit"){ closeSit(); return; }
+    if (act==="export"){
+      const stamp = new Date().toISOString().slice(0,10);
+      download("black-transfer-"+stamp+".json", JSON.stringify({kind:"black-transfer", version:1, exportedAt:Date.now(), ...state}), "application/json");
+      toast("Transfer file saved."); return;
+    }
+    if (act==="ask-wipe"){
+      openModal(`<p class="eyebrow">Wipe</p>
+        <h3 style="margin:.3rem 0 .6rem">Everything on this device.</h3>
+        <p class="small muted">The PLE bank, sittings, and name — gone.</p>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn warn" type="button" data-act="do-wipe">Wipe this device</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-wipe"){
+      const theme = state.theme;
+      state = defaultState(); state.theme = theme;
+      document.documentElement.classList.toggle("light", state.theme==="light");
+      save(); closeModal(); toast("Wiped."); go("#/"); return;
+    }
+  }
+
+  function render(){
+    const r = route();
+    let html = "";
+    if (r.name==="subject") html = viewSubject(r.id);
+    else if (r.name==="sit") html = viewSit(r.id);
+    else if (r.name==="results") html = viewResults();
+    else if (r.name==="you") html = viewYou();
+    else html = viewHub();
+    document.getElementById("app").innerHTML = html;
+    bind();
+  }
+
+  window.addEventListener("hashchange", render);
+  render();
+})();
+  </script>
+</body>
+</html>
