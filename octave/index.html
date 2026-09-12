@@ -467,6 +467,166 @@
       return { refId: r.refId, chapter: inp ? (inp.value||"").trim() : (r.chapter||"") };
     });
   }
+  function detectDelim(text){
+    const sample = text.split(/\r?\n/).slice(0,6).join("\n");
+    const c=(sample.match(/,/g)||[]).length, s=(sample.match(/;/g)||[]).length, t=(sample.match(/\t/g)||[]).length;
+    if (t>c && t>s) return "\t"; if (s>c) return ";"; return ",";
+  }
+  function parseCsvText(text){
+    const raw = String(text||"").replace(/^\uFEFF/,"");
+    const delim = detectDelim(raw);
+    const rows=[]; let row=[], cell="", inQ=false;
+    for (let i=0;i<raw.length;i++){
+      const ch=raw[i], next=raw[i+1];
+      if (inQ){
+        if (ch==='"'){ if(next==='"'){ cell+='"'; i++; } else inQ=false; }
+        else cell+=ch;
+      } else if (ch==='"') inQ=true;
+      else if (ch===delim){ row.push(cell); cell=""; }
+      else if (ch==="\n"){ row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row); row=[]; cell=""; }
+      else if (ch!=="\r") cell+=ch;
+    }
+    row.push(cell); if(row.some(x=>x.trim()!=="")) rows.push(row);
+    return rows.map(r => r.map(c => c.trim()));
+  }
+  function nHead(h){ return String(h||"").trim().toLowerCase().replace(/[\s-]+/g,"_"); }
+  function lookup(map, keys){ for (const k of keys) if (map[k]) return map[k]; return ""; }
+  function splitOptions(v){
+    if (!v) return [];
+    const parts = v.includes("|") ? v.split("|") : v.includes(";") ? v.split(";") : String(v).split(/\s*\n\s*/);
+    return parts.map(p => p.trim().replace(/^[A-Da-d][.)]\s*/, "")).filter(Boolean);
+  }
+  function resolveCorrect(correct, options){
+    const raw = String(correct||"").trim(); if (!raw) return -1;
+    const letter = raw.replace(/[^A-Za-z0-9]/g,"");
+    if (/^[A-Da-d]$/.test(letter)) return letter.toUpperCase().charCodeAt(0)-65;
+    if (/^[1-4]$/.test(letter)) return Number(letter)-1;
+    const lower = raw.toLowerCase();
+    let i = options.findIndex(o => o.toLowerCase()===lower);
+    if (i>=0) return i;
+    return options.findIndex(o => o.toLowerCase().includes(lower) || lower.includes(o.toLowerCase()));
+  }
+  function interpretCsv(text){
+    const table = parseCsvText(text);
+    const errors=[];
+    if (!table.length) return {rows:[], errors:[{line:1,message:"File is empty."}]};
+    const STEM=["question","stem","q","item","prompt"];
+    const RAT=["rationale","explanation","explain","discussion","reason"];
+    const COR=["correct","answer","correct_answer","correctanswer","key","ans"];
+    const OPT=["options","choices","choices_text"];
+    const COLS=[
+      ["option_a","optiona","a","choice_a","choicea","option1","opt_a","opt1"],
+      ["option_b","optionb","b","choice_b","choiceb","option2","opt_b","opt2"],
+      ["option_c","optionc","c","choice_c","choicec","option3","opt_c","opt3"],
+      ["option_d","optiond","d","choice_d","choiced","option4","opt_d","opt4"]
+    ];
+    const first = table[0].map(nHead);
+    const hasHeader = first.some(h => STEM.includes(h)||COR.includes(h)||RAT.includes(h)||h==="option_a"||h==="options"||h==="a");
+    let headers = first, body = table.slice(1);
+    if (!hasHeader){ headers=["question","option_a","option_b","option_c","option_d","correct","rationale"]; body=table; }
+    const rows=[];
+    body.forEach((cols,i) => {
+      const line = hasHeader ? i+2 : i+1;
+      const map={}; headers.forEach((h,idx)=> map[h]=cols[idx]||"");
+      const stem = lookup(map, STEM);
+      const rationale = lookup(map, RAT);
+      const packed = lookup(map, OPT);
+      let options = packed ? splitOptions(packed) : COLS.map(k => lookup(map,k)).filter(Boolean);
+      if (!stem){ errors.push({line,message:"Missing question text."}); return; }
+      if (options.length<2){ errors.push({line,message:"Need at least two options."}); return; }
+      if (options.length>4) options = options.slice(0,4);
+      const ci = resolveCorrect(lookup(map,COR), options);
+      if (ci<0 || ci>=options.length){ errors.push({line,message:"Could not match correct answer. Use A–D or the option text."}); return; }
+      rows.push({stem, options, correctIndex:ci, rationale});
+    });
+    return {rows, errors};
+  }
+  function examQKey(q){
+    return String(q && q.stem || "").toLowerCase()
+      .replace(/[''`]/g, "'")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+  function addRowsToExam(exam, rows){
+    const seen = new Set((exam.questions||[]).map(examQKey));
+    let added=0, dupes=0;
+    rows.forEach(r => {
+      const k = examQKey(r);
+      if (!k) return;
+      if (seen.has(k)){ dupes++; return; }
+      seen.add(k);
+      exam.questions.push({ stem:r.stem, options:r.options.slice(), correctIndex:r.correctIndex, rationale:r.rationale||"" });
+      added++;
+    });
+    return { added, dupes };
+  }
+  const CSV_HEADER = "question,option_a,option_b,option_c,option_d,correct,rationale";
+  const CSV_SAMPLE = CSV_HEADER + "\n" +
+    "\"Which nerve innervates serratus anterior?\",\"Long thoracic\",\"Thoracodorsal\",\"Dorsal scapular\",\"Suprascapular\",A,\"The long thoracic nerve (C5–C7) supplies serratus anterior.\"\n" +
+    "\"The sternal angle corresponds to which disc?\",\"T2/T3\",\"T4/T5\",\"T6/T7\",\"T8/T9\",B,\"The sternal angle of Louis marks the T4/T5 disc.\"\n";
+  function download(filename, contents, mime){
+    const blob = new Blob([contents], {type: mime||"text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function ingestCsvFiles(files, courseId, examId){
+    Promise.all([...files].map(f => f.text().then(text => ({name:f.name, text}))))
+      .then(list => {
+        let rows=[], errors=[];
+        list.forEach(f => {
+          const r = interpretCsv(f.text);
+          rows = rows.concat(r.rows);
+          r.errors.forEach(e => errors.push(Object.assign({file:f.name}, e)));
+        });
+        if (!rows.length){
+          const e0 = errors[0];
+          toast(e0 ? ((e0.file?e0.file+" ":"")+"line "+e0.line+": "+e0.message) : "No questions in that CSV.");
+          return;
+        }
+        let exam = examId ? state.exams.find(e => e.id===examId) : null;
+        if (!exam){
+          const c = course(courseId)||{};
+          const first = (list[0] && list[0].name || "import.csv").replace(/\.[^.]+$/, "");
+          exam = {
+            id: uid("ex"), courseId, shifting: cur().shifting, week: cur().week,
+            title: first || (weekLabel(cur().week, cur().shifting)+" · "+(c.code||"set")),
+            questions: [], createdAt: Date.now()
+          };
+          state.exams.push(exam);
+        }
+        const {added, dupes} = addRowsToExam(exam, rows);
+        save();
+        const bits = [added+" item"+(added===1?"":"s")+" added"];
+        if (dupes) bits.push(dupes+" copy skipped");
+        if (errors.length) bits.push(errors.length+" row invalid");
+        toast(bits.join(" · "));
+        go("#/exam/"+exam.id);
+      })
+      .catch(() => toast("Could not read that CSV."));
+  }
+  function csvHint(){
+    return `<p class="small muted">CSV first row, in this order: <span class="mono">${CSV_HEADER}</span>. <code>correct</code> is A, B, C, or D. Quote any cell that has a comma. Multiple files are fine — copies of the same stem are kept once.</p>`;
+  }
+  function practiceSetBlock(id, exams){
+    return `<p class="section">Practice set</p>
+      <div class="row" style="margin-bottom:.55rem">
+        <button class="btn" type="button" data-act="new-exam" data-id="${id}">Write a practice set</button>
+        <label class="btn sec">Import CSV<input class="csv-in" type="file" accept=".csv,text/csv,text/plain" multiple hidden data-id="${id}" /></label>
+        <button class="btn ghost" type="button" data-act="csv-template">CSV template</button>
+      </div>
+      ${csvHint()}
+      ${exams.length===0?`<p class="small muted">None yet. Write a short set from this week, or drop a CSV.</p>`:
+        exams.map(e => `<div class="card row" style="justify-content:space-between;margin-top:.5rem">
+          <div><p class="display" style="margin:0;font-size:1.05rem">${esc(e.title)}</p>
+          <p class="small muted" style="margin:.15rem 0 0">${e.questions.length} item${e.questions.length===1?"":"s"}</p></div>
+          <div class="row">
+            <a class="btn sm" href="#/exam/${e.id}">Edit</a>
+            <a class="btn sm sec" href="#/sit/${e.id}">Sit</a>
+          </div>
+        </div>`).join("")}`;
+  }
 
   function weekStats(s,w){
     let conf=0, n=0, read=0, notes=0, exams=0;
@@ -706,19 +866,7 @@
         <textarea id="notes" class="notes" placeholder="What I would want the night before the long exam.">${esc(cell.notes)}</textarea>
         <p class="small subtle" style="margin:.5rem 0 0">Saved with this week. Autosaves as I type.</p>
       </div>
-      <p class="section">Practice set</p>
-      <div class="row" style="margin-bottom:.6rem">
-        <button class="btn" type="button" data-act="new-exam" data-id="${id}">Write a practice set</button>
-      </div>
-      ${exams.length===0?`<p class="small muted">None yet. A short set from this week’s lectures, then sit it.</p>`:
-        exams.map(e => `<div class="card row" style="justify-content:space-between;margin-bottom:.5rem">
-          <div><p class="display" style="margin:0;font-size:1.05rem">${esc(e.title)}</p>
-          <p class="small muted" style="margin:.15rem 0 0">${e.questions.length} item${e.questions.length===1?"":"s"}</p></div>
-          <div class="row">
-            <a class="btn sm" href="#/exam/${e.id}">Edit</a>
-            <a class="btn sm sec" href="#/sit/${e.id}">Sit</a>
-          </div>
-        </div>`).join("")}`;
+      ${practiceSetBlock(id, exams)}`;
     const longBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
@@ -748,6 +896,7 @@
         <textarea id="notes" class="notes" placeholder="What I would want the night before the long exam.">${esc(cell.notes)}</textarea>
         <p class="small subtle" style="margin:.5rem 0 0">Saved with this long exam. Autosaves as I type.</p>
       </div>
+      ${practiceSetBlock(id, exams)}
       <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This is the shifting as a whole.</p>`;
     const yearBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
@@ -778,6 +927,7 @@
         <textarea id="notes" class="notes" placeholder="What I would want walking into compre.">${esc(cell.notes)}</textarea>
         <p class="small subtle" style="margin:.5rem 0 0">Saved with the year compre. Autosaves as I type.</p>
       </div>
+      ${practiceSetBlock(id, exams)}
       <p class="small subtle" style="margin-top:1rem">This is not a week and not a shifting. It is everything from shifting 1 through 4.</p>`;
     return shell(`
       <a class="small muted" href="#/">← ${esc(slotLabel(shifting, week))}</a>
@@ -801,12 +951,17 @@
     if (!exam) return shell(`<p class="muted">That exam isn’t here.</p><p><a class="btn" href="#/">Week</a></p>`);
     const c = course(exam.courseId);
     return shell(`
-      <a class="small muted" href="#/c/${exam.courseId}">← ${esc(c?c.name:"Course")} · W${exam.week}</a>
+      <a class="small muted" href="#/c/${exam.courseId}">← ${esc(c?displayName(c):"Course")} · ${esc(weekLabel(exam.week, exam.shifting))}</a>
       <h1 class="hero" style="margin-top:.7rem">${esc(exam.title)}</h1>
-      <p class="lead">Shifting ${exam.shifting} · week ${exam.week}. Write items from this week’s lectures, then sit.</p>
+      <p class="lead">${esc(slotLabel(exam.shifting, exam.week))}. Write items, or drop a CSV of this week’s lectures.</p>
       <label class="field" style="margin-top:1rem">Title
         <input id="exam-title" type="text" value="${esc(exam.title)}" />
       </label>
+      <div class="row" style="margin-top:.7rem">
+        <label class="btn sec">Import CSV<input class="csv-in" type="file" accept=".csv,text/csv,text/plain" multiple hidden data-id="${exam.courseId}" data-exam="${exam.id}" /></label>
+        <button class="btn ghost" type="button" data-act="csv-template">CSV template</button>
+      </div>
+      ${csvHint()}
       <div class="stack" style="margin-top:1rem">
         ${exam.questions.map((q,i) => `<div class="card">
           <p class="small mono subtle" style="margin:0">${i+1}</p>
@@ -1184,6 +1339,16 @@
         save(); toast("This device now matches the other one."); go("#/");
       }).catch(() => toast("That isn’t an Octave transfer file."));
     };
+    document.querySelectorAll("input.csv-in").forEach(el => {
+      el.onchange = () => {
+        const files = [...(el.files||[])];
+        const courseId = el.getAttribute("data-id");
+        const examId = el.getAttribute("data-exam")||"";
+        el.value = "";
+        if (!files.length) return;
+        ingestCsvFiles(files, courseId, examId);
+      };
+    });
     window.onkeydown = (e) => {
       if (e.key==="Escape" && document.querySelector(".overlay")) closeModal();
     };
@@ -1373,6 +1538,11 @@
       save(); toast("Removed."); 
       if (courseRefs(c).length) handleAct({ dataset: { act:"ask-edit-refs", id:c.id } });
       else { closeModal(); render(); }
+      return;
+    }
+    if (act==="csv-template"){
+      download("octave-practice.csv", CSV_SAMPLE, "text/csv");
+      toast("Template saved — fill it, then Import CSV.");
       return;
     }
     if (act==="new-exam"){
