@@ -220,6 +220,12 @@
       background: var(--elevated); color: var(--muted); font-size: .78rem; font-weight: 600;
     }
     .conf button.on { background: var(--accent); color: var(--accent-fg); }
+    .refs { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .refs .chip {
+      min-height: 2.15rem; padding: 0 .8rem; border-radius: 999px; border: 0; cursor: pointer;
+      background: var(--elevated); color: var(--muted); font-size: .8rem; font-weight: 600;
+    }
+    .refs .chip.on { background: var(--accent); color: var(--accent-fg); }
     .bar-read { height: .35rem; background: var(--elevated); border-radius: 99px; overflow: hidden; }
     .bar-read > span { display: block; height: 100%; background: var(--accent); }
     input[type=range] { width: 100%; accent-color: var(--accent); }
@@ -288,7 +294,7 @@
 
   function defaultCourses(){
     return Array.from({length:7}, (_,i) => ({
-      id: "c"+(i+1), name: "Course "+(i+1), code: "C"+(i+1)
+      id: "c"+(i+1), name: "Course "+(i+1), code: "C"+(i+1), refs: []
     }));
   }
   const YEAR_LEVELS = { YL1: "Year 1", YL2: "Year 2", YL3: "Year 3" };
@@ -313,7 +319,7 @@
       const d = JSON.parse(raw);
       return Object.assign(defaultState(), d, {
         cells: d.cells||{}, exams: d.exams||[], attempts: d.attempts||[],
-        courses: (d.courses&&d.courses.length)?d.courses:defaultCourses(),
+        courses: ((d.courses&&d.courses.length)?d.courses:defaultCourses()).map(c => Object.assign({ refs: [] }, c, { refs: Array.isArray(c.refs)?c.refs:[] })),
         profile: Object.assign(defaultProfile(), d.profile||{})
       });
     } catch(e){ return defaultState(); }
@@ -349,7 +355,7 @@
   function go(hash){ location.hash = hash; }
 
   function key(s,w,c){ return s+"-"+w+"-"+c; }
-  function emptyCell(){ return { topics:"", pages:"", reading:0, confidence:0, notes:"", hours:0, updatedAt:0 }; }
+  function emptyCell(){ return { topics:"", pages:"", reading:0, confidence:0, notes:"", hours:0, refReads:[], updatedAt:0 }; }
   function getCell(s,w,c){ return Object.assign(emptyCell(), state.cells[key(s,w,c)]||{}); }
   function putCell(s,w,c, patch){
     const cur = getCell(s,w,c);
@@ -365,21 +371,21 @@
   function interpretConf(n){
     n = Number(n)||0;
     return ({
-      0: { title: "Not logged", body: "No confidence score yet." },
-      1: { title: "Not ready", body: "This still needs a first pass. I would not sit a comprehensive on it." },
-      2: { title: "Early", body: "I recognize it. I cannot teach it back yet." },
-      3: { title: "Fair", body: "It holds with notes. Thin for a comprehensive until I can do it cold." },
-      4: { title: "Good", body: "I can explain it cold. One more pass would lock it for the exam." },
-      5: { title: "Ready", body: "Exam-ready for this course, on what I reported." }
+      0: { title: "Not logged", body: "No score yet. One tap after I read is enough." },
+      1: { title: "Not ready", body: "Still a first pass. I would not sit compre on this." },
+      2: { title: "Early", body: "I recognize the lecture. I cannot teach it back yet." },
+      3: { title: "Fair", body: "It holds with notes. Thin for compre until I can do it cold." },
+      4: { title: "Good", body: "I can explain it cold. One more pass before the exam." },
+      5: { title: "Ready", body: "Exam-ready for this course, on what I logged." }
     })[n];
   }
   function interpretMean(mean, logged, total){
-    if (!logged) return { title: "Not logged", body: "Log a confidence score on each course and I will read how this block sits." };
+    if (!logged) return { title: "Not logged", body: "Score each course and I will say whether this block is ready for compre." };
     const thin = Math.max(0, total-logged);
     const tail = thin ? " "+thin+" course"+(thin===1?"":"s")+" still have no score." : "";
-    if (mean < 2) return { title: "Not ready", body: "Mean "+mean.toFixed(1)+" of 5. This block is not ready for a comprehensive."+tail };
+    if (mean < 2) return { title: "Not ready", body: "Mean "+mean.toFixed(1)+" of 5. Not ready for compre."+tail };
     if (mean < 3) return { title: "Early", body: "Mean "+mean.toFixed(1)+" of 5. Recognition only. Another pass before I treat this as review."+tail };
-    if (mean < 3.7) return { title: "Fair", body: "Mean "+mean.toFixed(1)+" of 5. It holds with notes. Weak courses below still decide the comprehensive."+tail };
+    if (mean < 3.7) return { title: "Fair", body: "Mean "+mean.toFixed(1)+" of 5. It holds with notes. Weak courses still decide compre."+tail };
     if (mean < 4.5) return { title: "Good", body: "Mean "+mean.toFixed(1)+" of 5. On track. Lock anything still sitting on notes."+tail };
     return { title: "Ready", body: "Mean "+mean.toFixed(1)+" of 5. This block looks exam-ready on what I logged."+tail };
   }
@@ -399,6 +405,48 @@
     return `<div class="legend">${items.map(([n,num,lab]) =>
       `<span class="sw"><i class="chip c${n}"></i>${num?`<span class="n">${num}</span>`:""}${esc(lab)}</span>`
     ).join("")}</div>`;
+  }
+  function courseRefs(c){ return (c && Array.isArray(c.refs)) ? c.refs : []; }
+  function cellReads(cell){ return Array.isArray(cell && cell.refReads) ? cell.refReads : []; }
+  function sourceLine(cell, c){
+    const refs = courseRefs(c);
+    const picks = cellReads(cell).map(r => {
+      const ref = refs.find(x => x.id===r.refId);
+      if (!ref) return "";
+      const ch = (r.chapter||"").trim();
+      return ch ? (ref.title+" · "+ch) : ref.title;
+    }).filter(Boolean);
+    if (picks.length) return picks.join(" · ");
+    if ((cell.pages||"").trim()) return cell.pages.trim();
+    return "";
+  }
+  function refsEditor(c, cell){
+    const refs = courseRefs(c);
+    const reads = cellReads(cell);
+    return `<p class="eyebrow">References</p>
+      <p class="small muted" style="margin:0">Textbooks and decks for this course. Toggle what I opened, then the chapter.</p>
+      ${refs.length? `<div class="refs">${refs.map(ref => {
+        const on = reads.some(r => r.refId===ref.id);
+        return `<button type="button" class="chip ${on?"on":""}" data-act="toggle-ref" data-id="${c.id}" data-ref="${ref.id}">${esc(ref.title)}</button>`;
+      }).join("")}</div>` : `<p class="small muted" style="margin:0">None yet. Robbins, Guyton, the lecture deck — whatever I actually open.</p>`}
+      ${reads.map(r => {
+        const ref = refs.find(x => x.id===r.refId);
+        if (!ref) return "";
+        return `<label class="field">${esc(ref.title)}
+          <input type="text" data-refch="${ref.id}" value="${esc(r.chapter||"")}" placeholder="e.g. ch. 7, pp. 201–240" />
+        </label>`;
+      }).join("")}
+      <div class="row">
+        <button class="btn ghost sm" type="button" data-act="ask-add-ref" data-id="${c.id}">Add a reference</button>
+        ${refs.length? `<button class="btn ghost sm" type="button" data-act="ask-edit-refs" data-id="${c.id}">Edit list</button>`:""}
+      </div>`;
+  }
+  function harvestRefReads(courseId){
+    const cell = getCell(cur().shifting, cur().week, courseId);
+    return cellReads(cell).map(r => {
+      const inp = document.querySelector('[data-refch="'+r.refId+'"]');
+      return { refId: r.refId, chapter: inp ? (inp.value||"").trim() : (r.chapter||"") };
+    });
   }
 
   function weekStats(s,w){
@@ -508,14 +556,14 @@
   function viewSetup(){
     const p = state.profile || defaultProfile();
     return shell(`
-      <p class="eyebrow">First sitting</p>
-      <h1 class="hero">This log is yours.</h1>
-      <p class="lead">Nickname, course, and year level — then the subjects for this year.</p>
+      <p class="eyebrow">New log</p>
+      <h1 class="hero">This year’s subjects.</h1>
+      <p class="lead">My name, program, and year — then the courses I am carrying this shifting.</p>
       <form class="stack" style="margin-top:1.2rem" data-act="save-courses">
-        <label class="field">Nickname<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="What I call myself here" autocomplete="nickname" /></label>
-        <label class="field">Course<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
-        <label class="field">Year level${yearSelect("pf-year", p.yearLevel)}</label>
-        <p class="section">Subjects this year</p>
+        <label class="field">What I go by<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="e.g. Jerald" autocomplete="nickname" /></label>
+        <label class="field">Program<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
+        <label class="field">Year${yearSelect("pf-year", p.yearLevel)}</label>
+        <p class="section">Courses this year</p>
         ${state.courses.map((c,i) => `<div class="row" style="align-items:flex-end">
           <label class="field" style="flex:1">Subject ${i+1}
             <input type="text" data-course="${c.id}" value="${esc(/^Course \d+$/.test(c.name)?"":c.name)}" placeholder="e.g. MD201 Pathology" />
@@ -536,15 +584,15 @@
     const {shifting, week} = cur();
     const ws = weekStats(shifting, week);
     return shell(`
-      <p class="who">${esc(whoLine() || "Reading log")}</p>
+      <p class="who">${esc(whoLine() || "Year 2 log")}</p>
       <h1 class="hero">${helloName() ? "Hello, "+esc(helloName())+"." : "Hello."}</h1>
       <p class="lead">${slotLabel(shifting, week)}. ${isCompre(week)
-        ? "After this shifting. No weekly topics — review progress and confidence per course, then a read on how prepared I am."
-        : (helloName() ? "Coverage, reading, confidence, notes, and any exam I wrote." : "Add a name under You so this desk greets me.")}</p>
+        ? "Compre for this shifting — how far the reread got, and whether I would sit it."
+        : (helloName() ? "Lectures this week, how far I got in the text, and whether I can still explain it." : "Put my name under You so this page greets me.")}</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
-      <p class="section">Week, then comprehensive</p>
+      <p class="section">Weeks, then compre</p>
       <div class="weekbar">
         ${Array.from({length:WEEKS},(_,i)=>i+1).map(w => `<button type="button" class="${week===w?"on":""}" data-act="set-week" data-w="${w}">${w}</button>`).join("")}
         <button type="button" class="wide ${week===COMPRE?"on":""}" data-act="set-week" data-w="${COMPRE}">Compre</button>
@@ -572,8 +620,8 @@
             (cell.notes||"").trim() ? "notes" : ""
           ].filter(Boolean);
           const meta = isCompre(week)
-            ? (cell.confidence ? interpretConf(cell.confidence).body : "Review progress only — no weekly topics.")
-            : ((cell.topics||"").trim() || "No coverage logged");
+            ? (sourceLine(cell, c) || (cell.confidence ? interpretConf(cell.confidence).body : "Compre review. No lecture list."))
+            : (sourceLine(cell, c) || (cell.topics||"").trim() || "No lecture logged");
           return `<a class="card course-row" href="#/c/${c.id}">
             <p class="mono eyebrow code">${esc(c.code)}</p>
             <h2>${esc(title)}</h2>
@@ -586,7 +634,7 @@
       <div class="row" style="margin-top:.75rem">
         <button class="btn" type="button" data-act="add-course">Add a course</button>
       </div>
-      <p class="small subtle" style="margin-top:1.4rem">Progress reads this week across all four shiftings, and each comprehensive after week 8.</p>
+      <p class="small subtle" style="margin-top:1.4rem">Progress reads the same week across all four shiftings, and each compre after week 8.</p>
     `, true);
   }
 
@@ -601,14 +649,15 @@
     const weeklyBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
-          <p class="eyebrow">This week’s coverage</p>
-          <label class="field">Topics
-            <textarea id="topics" style="min-height:5rem" placeholder="What was introduced this week">${esc(cell.topics)}</textarea>
+          <p class="eyebrow">This week’s lectures</p>
+          <label class="field">What was discussed
+            <textarea id="topics" style="min-height:5rem" placeholder="Systems, lesions, drugs, cases — whatever was introduced">${esc(cell.topics)}</textarea>
           </label>
-          <label class="field">Chapter / pages
-            <input id="pages" type="text" value="${esc(cell.pages)}" placeholder="e.g. Robbins ch. 3, pp. 80–112" />
+          ${refsEditor(c, cell)}
+          <label class="field">Other (slides, handouts)
+            <input id="pages" type="text" value="${esc(cell.pages)}" placeholder="If it isn’t in the list above" />
           </label>
-          <label class="field">Reading ${cell.reading}%
+          <label class="field">How far I got ${cell.reading}%
             <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
           </label>
           <label class="field">Hours on this
@@ -616,8 +665,8 @@
           </label>
         </div>
         <div class="card stack">
-          <p class="eyebrow">Self-reported confidence</p>
-          <p class="small muted" style="margin:0">How this week of this course sits, today. One score. Change it when it moves.</p>
+          <p class="eyebrow">Can I teach this back?</p>
+          <p class="small muted" style="margin:0">One score for this week of this course. Change it when it moves.</p>
           <div class="conf">
             ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
           </div>
@@ -626,16 +675,16 @@
         </div>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
-      <p class="section">Revision notes</p>
+      <p class="section">High-yield notes</p>
       <div class="card">
-        <textarea id="notes" class="notes" placeholder="High-yield only. What I would want the night before the exam.">${esc(cell.notes)}</textarea>
-        <p class="small subtle" style="margin:.5rem 0 0">Saved with the week. Autosaves as I type.</p>
+        <textarea id="notes" class="notes" placeholder="What I would want the night before the shifting exam.">${esc(cell.notes)}</textarea>
+        <p class="small subtle" style="margin:.5rem 0 0">Saved with this week. Autosaves as I type.</p>
       </div>
-      <p class="section">Practice exams</p>
+      <p class="section">Practice set</p>
       <div class="row" style="margin-bottom:.6rem">
-        <button class="btn" type="button" data-act="new-exam" data-id="${id}">New exam for this week</button>
+        <button class="btn" type="button" data-act="new-exam" data-id="${id}">Write a practice set</button>
       </div>
-      ${exams.length===0?`<p class="small muted">None yet. Write a short set from this week’s coverage, then sit it.</p>`:
+      ${exams.length===0?`<p class="small muted">None yet. A short set from this week’s lectures, then sit it.</p>`:
         exams.map(e => `<div class="card row" style="justify-content:space-between;margin-bottom:.5rem">
           <div><p class="display" style="margin:0;font-size:1.05rem">${esc(e.title)}</p>
           <p class="small muted" style="margin:.15rem 0 0">${e.questions.length} item${e.questions.length===1?"":"s"}</p></div>
@@ -647,9 +696,10 @@
     const compreBlock = `
       <div class="grid-2" style="margin-top:1.1rem">
         <div class="card stack">
-          <p class="eyebrow">Review progress</p>
-          <p class="small muted" style="margin:0">No weekly topics here. This is the comprehensive after shifting ${shifting}.</p>
-          <label class="field">How far the review got ${cell.reading}%
+          <p class="eyebrow">Compre reread</p>
+          <p class="small muted" style="margin:0">The shifting as a whole. Not lecture-by-lecture.</p>
+          ${refsEditor(c, cell)}
+          <label class="field">How far the reread got ${cell.reading}%
             <input id="reading" type="range" min="0" max="100" step="5" value="${cell.reading}" />
           </label>
           <label class="field">Hours on this review
@@ -657,24 +707,24 @@
           </label>
         </div>
         <div class="card stack">
-          <p class="eyebrow">Self-reported confidence</p>
-          <p class="small muted" style="margin:0">How this course sits for the comprehensive, across the whole shifting.</p>
+          <p class="eyebrow">Would I sit it?</p>
+          <p class="small muted" style="margin:0">One score for this course across the whole shifting.</p>
           <div class="conf">
             ${[1,2,3,4,5].map(n => `<button type="button" class="${cell.confidence===n?"on":""}" data-act="conf" data-n="${n}">${n} ${CONF[n]}</button>`).join("")}
           </div>
           <p class="small subtle" style="margin:0">${cell.updatedAt? "Last logged "+new Date(cell.updatedAt).toLocaleString():"Not logged yet."}</p>
-          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this comprehensive</button>
+          <button class="btn" type="button" data-act="save-cell" data-id="${id}">Save this compre</button>
         </div>
       </div>
       <div style="margin-top:.7rem"><div class="read"><p class="eyebrow">Preparedness</p><p class="t">${esc(inter.title)}</p><p>${esc(inter.body)}</p></div></div>
-      <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This section is the shifting as a whole.</p>`;
+      <p class="small subtle" style="margin-top:1rem">Weekly notes stay in weeks 1–8. This is the shifting as a whole.</p>`;
     return shell(`
       <a class="small muted" href="#/">← ${esc(slotLabel(shifting, week))}</a>
       <div class="row" style="justify-content:space-between;align-items:flex-end;margin-top:.7rem">
         <div>
           <p class="eyebrow">${esc(c.code)}</p>
           <h1 class="hero">${esc(displayName(c))}</h1>
-          <p class="lead">${compre ? "Comprehensive after shifting "+shifting+"." : "Week "+week+" of shifting "+shifting+"."}</p>
+          <p class="lead">${compre ? "Compre after shifting "+shifting+"." : "Week "+week+" of shifting "+shifting+"."}</p>
         </div>
         <div class="row">
           <button class="btn ghost sm" type="button" data-act="rename-course" data-id="${c.id}">Edit title</button>
@@ -692,7 +742,7 @@
     return shell(`
       <a class="small muted" href="#/c/${exam.courseId}">← ${esc(c?c.name:"Course")} · W${exam.week}</a>
       <h1 class="hero" style="margin-top:.7rem">${esc(exam.title)}</h1>
-      <p class="lead">Shifting ${exam.shifting} · week ${exam.week}. Add items, then sit.</p>
+      <p class="lead">Shifting ${exam.shifting} · week ${exam.week}. Write items from this week’s lectures, then sit.</p>
       <label class="field" style="margin-top:1rem">Title
         <input id="exam-title" type="text" value="${esc(exam.title)}" />
       </label>
@@ -800,7 +850,7 @@
     return shell(`
       <p class="eyebrow">Map</p>
       <h1 class="hero">Shifting ${shifting}.</h1>
-      <p class="lead">Weeks 1–8, then the comprehensive. Colour is the confidence I logged.</p>
+      <p class="lead">Eight weeks and compre. Colour is how well I still know it.</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
@@ -850,7 +900,7 @@
     return shell(`
       <p class="eyebrow">Progress</p>
       <h1 class="hero">How this year sits.</h1>
-      <p class="lead">Self-reported confidence, then a read on preparedness — each week across the four shiftings, and each comprehensive after week 8.</p>
+      <p class="lead">How sure I am, week by week — then whether I am ready for compre.</p>
       <div class="row shiftbar" style="margin-top:1rem">
         ${[1,2,3,4].map(s => `<button type="button" class="${shifting===s?"on":""}" data-act="set-shift" data-s="${s}">Shifting ${s}</button>`).join("")}
       </div>
@@ -910,16 +960,16 @@
       </table></div>`}
       <p class="section">You</p>
       <div class="card">
-        <p class="display" style="margin:0;font-size:1.15rem">${esc(state.profile.nickname || "No nickname yet")}</p>
-        <p class="small muted" style="margin:.25rem 0 0">${esc(whoLine() || "Add a nickname, course, and year level.")}</p>
+        <p class="display" style="margin:0;font-size:1.15rem">${esc(state.profile.nickname || "No name yet")}</p>
+        <p class="small muted" style="margin:.25rem 0 0">${esc(whoLine() || "Add a name, program, and year.")}</p>
         <div class="row" style="margin-top:.7rem">
           <a class="btn" href="#/you">Edit profile</a>
-          <a class="btn ghost" href="#/setup">Rename subjects</a>
+          <a class="btn ghost" href="#/setup">Rename courses</a>
         </div>
       </div>
       <p class="section">New year</p>
       <div class="card">
-        <p class="small muted" style="margin-top:0">When Year 2 is done: clear every week’s logs, notes, exams, and scores. Keep my nickname and the seven subject names, then set Year 3. The desk starts empty again.</p>
+        <p class="small muted" style="margin-top:0">When Year 2 is done: clear every week’s logs, notes, practice sets, and scores. Keep my name and course titles, then set Year 3. References stay. The log starts empty.</p>
         <div class="row">
           <button class="btn" type="button" data-act="ask-new-year">Start a new year</button>
           <button class="btn warn sm" type="button" data-act="ask-wipe">Wipe this device</button>
@@ -927,7 +977,7 @@
       </div>
       <p class="section">This device</p>
       <div class="card">
-        <p class="small muted" style="margin-top:0">Laptop and iPad do not share this log. Save a transfer file, then restore on the other device.</p>
+        <p class="small muted" style="margin-top:0">Laptop and iPad do not share this log. Save a transfer file, then restore on the other one.</p>
         <div class="row">
           <button class="btn" type="button" data-act="export">Save transfer file</button>
           <label class="btn sec">Restore<input id="restore" type="file" accept="application/json,.json" hidden /></label>
@@ -940,12 +990,12 @@
     const p = state.profile || defaultProfile();
     return shell(`
       <p class="eyebrow">You</p>
-      <h1 class="hero">${helloName() ? "Hello, "+esc(helloName())+"." : "Add a name to this desk."}</h1>
-      <p class="lead">Saved on this device. The week view will greet me by this name.</p>
+      <h1 class="hero">${helloName() ? "Hello, "+esc(helloName())+"." : "Add a name."}</h1>
+      <p class="lead">This device only. The week view should greet me with this name.</p>
       <form class="stack" style="margin-top:1.2rem" data-act="save-profile">
-        <label class="field">Nickname<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="What I call myself here" autocomplete="nickname" /></label>
-        <label class="field">Course<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
-        <label class="field">Year level${yearSelect("pf-year", p.yearLevel)}</label>
+        <label class="field">What I go by<input id="pf-nick" name="nickname" type="text" value="${esc(p.nickname)}" placeholder="e.g. Jerald" autocomplete="nickname" /></label>
+        <label class="field">Program<input id="pf-program" name="program" type="text" value="${esc(p.program)}" placeholder="e.g. Doctor of Medicine" /></label>
+        <label class="field">Year${yearSelect("pf-year", p.yearLevel)}</label>
         <div class="row">
           <button class="btn" type="button" data-act="save-profile">Save profile</button>
           <a class="btn ghost" href="#/">Back to the week</a>
@@ -1029,15 +1079,26 @@
           pages: (document.getElementById("pages")||{}).value,
           reading: Number((document.getElementById("reading")||{}).value||0),
           hours: Number((document.getElementById("hours")||{}).value||0),
-          notes: (document.getElementById("notes")||{}).value
+          notes: (document.getElementById("notes")||{}).value,
+          refReads: harvestRefReads(r.id)
         };
         putCell(cur().shifting, cur().week, r.id, patch);
         if (id==="reading"){
           const lab = el.closest(".field");
-          if (lab) lab.childNodes[0].textContent = "Reading "+patch.reading+"%";
+          if (lab){
+            const raw = lab.childNodes[0];
+            if (raw && raw.textContent) raw.textContent = raw.textContent.replace(/\d+%/, patch.reading+"%");
+          }
         }
       };
       el.addEventListener(id==="notes"||id==="topics"?"input":"change", fire);
+    });
+    document.querySelectorAll("[data-refch]").forEach(el => {
+      el.addEventListener("input", () => {
+        const r = route();
+        if (r.name!=="course") return;
+        putCell(cur().shifting, cur().week, r.id, { refReads: harvestRefReads(r.id) });
+      });
     });
     const restore = document.getElementById("restore");
     if (restore) restore.onchange = () => {
@@ -1103,7 +1164,8 @@
         pages: (document.getElementById("pages")||{}).value,
         reading: Number((document.getElementById("reading")||{}).value||0),
         hours: Number((document.getElementById("hours")||{}).value||0),
-        notes: (document.getElementById("notes")||{}).value
+        notes: (document.getElementById("notes")||{}).value,
+        refReads: harvestRefReads(id)
       });
       toast("Week saved."); render(); return;
     }
@@ -1142,13 +1204,13 @@
       if (!name){ toast("Need a title."); return; }
       const code = ((document.getElementById("nc-code")||{}).value||"").trim().toUpperCase() || codeFromName(name, "NEW");
       const id = uid("c");
-      state.courses.push({ id, name, code });
+      state.courses.push({ id, name, code, refs: [] });
       state.named = true;
       save(); closeModal(); toast("Course added."); go("#/c/"+id); return;
     }
     if (act==="setup-add"){
       harvestSetupFields();
-      state.courses.push({ id: uid("c"), name: "", code: "C"+(state.courses.length+1) });
+      state.courses.push({ id: uid("c"), name: "", code: "C"+(state.courses.length+1), refs: [] });
       save(); render(); return;
     }
     if (act==="setup-remove"){
@@ -1161,7 +1223,7 @@
       const c = course(t.dataset.id);
       openModal(`<p class="eyebrow">Remove</p>
         <h3 style="margin:.3rem 0 .6rem">${esc(displayName(c))}</h3>
-        <p class="small muted">Deletes this course and its notes, coverage, and exams. The others stay.</p>
+        <p class="small muted">Deletes this course, its notes, lectures, references, and practice sets. The others stay.</p>
         <div class="row" style="margin-top:.8rem">
           <button class="btn warn" type="button" data-act="do-remove-course" data-id="${c.id}">Remove course</button>
           <button class="btn ghost" type="button" data-act="close-modal">Keep it</button>
@@ -1174,10 +1236,69 @@
       save(); closeModal(); toast("Course removed."); go("#/"); return;
     }
     if (act==="close-modal"){ closeModal(); return; }
+    if (act==="toggle-ref"){
+      const id = t.dataset.id, refId = t.dataset.ref;
+      let reads = harvestRefReads(id);
+      const i = reads.findIndex(r => r.refId===refId);
+      if (i>=0) reads.splice(i,1);
+      else reads.push({ refId, chapter: "" });
+      putCell(cur().shifting, cur().week, id, { refReads: reads });
+      render(); return;
+    }
+    if (act==="ask-add-ref"){
+      openModal(`<p class="eyebrow">Reference</p>
+        <h3 style="margin:.3rem 0 .5rem">Add a text for this course</h3>
+        <p class="small muted">Robbins, Guyton, Harrison’s, the lecture deck — the name I look for when I open a chapter.</p>
+        <label class="field">Name<input id="ref-title" type="text" placeholder="e.g. Robbins 10e" /></label>
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="do-add-ref" data-id="${t.dataset.id}">Add</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-add-ref"){
+      const c = course(t.dataset.id);
+      const title = ((document.getElementById("ref-title")||{}).value||"").trim();
+      if (!title){ toast("Need a name."); return; }
+      if (!Array.isArray(c.refs)) c.refs = [];
+      const exists = c.refs.some(r => r.title.toLowerCase()===title.toLowerCase());
+      if (exists){ toast("Already on this course."); closeModal(); return; }
+      c.refs.push({ id: uid("r"), title });
+      save(); closeModal(); toast("Reference added."); render(); return;
+    }
+    if (act==="ask-edit-refs"){
+      const c = course(t.dataset.id);
+      const refs = courseRefs(c);
+      openModal(`<p class="eyebrow">References</p>
+        <h3 style="margin:.3rem 0 .6rem">${esc(displayName(c))}</h3>
+        ${refs.length===0?`<p class="small muted">None yet.</p>`: refs.map(r => `<div class="row" style="justify-content:space-between;margin-bottom:.4rem">
+          <p style="margin:0">${esc(r.title)}</p>
+          <button class="btn ghost sm" type="button" data-act="do-remove-ref" data-id="${c.id}" data-ref="${r.id}">Remove</button>
+        </div>`).join("")}
+        <div class="row" style="margin-top:.8rem">
+          <button class="btn" type="button" data-act="ask-add-ref" data-id="${c.id}">Add another</button>
+          <button class="btn ghost" type="button" data-act="close-modal">Done</button>
+        </div>`);
+      return;
+    }
+    if (act==="do-remove-ref"){
+      const c = course(t.dataset.id);
+      c.refs = courseRefs(c).filter(r => r.id!==t.dataset.ref);
+      Object.keys(state.cells).forEach(k => {
+        const cell = state.cells[k];
+        if (cell && Array.isArray(cell.refReads)){
+          cell.refReads = cell.refReads.filter(r => r.refId!==t.dataset.ref);
+        }
+      });
+      save(); toast("Removed."); 
+      if (courseRefs(c).length) handleAct({ dataset: { act:"ask-edit-refs", id:c.id } });
+      else { closeModal(); render(); }
+      return;
+    }
     if (act==="new-exam"){
       openModal(`<p class="eyebrow">New exam</p>
         <h3 style="margin:.3rem 0 1rem">For this week</h3>
-        <label class="field">Title<input id="ex-title" type="text" placeholder="e.g. Week 3 coverage, 10 items" /></label>
+        <label class="field">Title<input id="ex-title" type="text" placeholder="e.g. Week 3 lectures, 10 items" /></label>
         <div class="row" style="margin-top:.8rem">
           <button class="btn" type="button" data-act="create-exam" data-id="${t.dataset.id}">Create</button>
           <button class="btn ghost" type="button" data-act="close-modal">Cancel</button>
